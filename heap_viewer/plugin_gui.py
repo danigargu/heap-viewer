@@ -145,7 +145,7 @@ class HeapPluginForm(PluginForm):
 
         try:
             current_libc_version = get_libc_version()
-            if self.config.libc_version == current_libc_version:
+            if self.config.libc_version == current_libc_version or current_libc_version == None:
                 self.heap = Heap(self.config)
                 self.btn_reload.setEnabled(True)
                 self.tabs.setTabEnabled(3, self.heap.tcache_enabled)
@@ -186,7 +186,7 @@ class HeapPluginForm(PluginForm):
         self.chunk_widget.show_chunk(address)
 
     def Show(self):
-        return PluginForm.Show(self, __plugname__, options = (
+        return PluginForm.Show(self, PLUGNAME, options = (
             PluginForm.FORM_TAB | PluginForm.FORM_CLOSE_LATER
         ))
     

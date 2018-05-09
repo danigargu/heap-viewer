@@ -16,7 +16,8 @@ from ctypes import *
 from collections import OrderedDict
 
 # --------------------------------------------------------------------------
-__plugname__ = 'HeapViewer'
+PLUGVER  = "0.1"
+PLUGNAME = "HeapViewer"
 
 PLUGIN_DIR  = idadir(os.path.join("plugins", "heap_viewer"))
 FILES_DIR   = os.path.join(PLUGIN_DIR, "files")
@@ -48,7 +49,7 @@ class HeapConfig(object):
 
 # --------------------------------------------------------------------------
 def log(msg):
-    idaapi.msg("[%s] %s\n" % (__plugname__, msg))
+    idaapi.msg("[%s] %s\n" % (PLUGNAME, msg))
 
 # --------------------------------------------------------------------------
 def round_up(offset, alignment):
