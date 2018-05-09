@@ -117,12 +117,16 @@ class TracerWidget(CustomWidget):
     def _create_menu(self):
         cb_enable_trace = QCheckBox()
         cb_enable_trace.stateChanged.connect(self.cb_tracing_changed)
+        self.cb_stop_during_tracing = QCheckBox()
+        
         btn_dump_trace = QtWidgets.QPushButton("Dump trace")
         btn_dump_trace.clicked.connect(self.btn_dump_trace_on_click)
         
         hbox_enable_trace = QHBoxLayout()
         hbox_enable_trace.addWidget(QLabel("Enable trace"))
         hbox_enable_trace.addWidget(cb_enable_trace)
+        hbox_enable_trace.addWidget(QLabel("Stop during tracing"))
+        hbox_enable_trace.addWidget(self.cb_stop_during_tracing)
         hbox_enable_trace.addWidget(btn_dump_trace)
         hbox_enable_trace.addStretch(1)
 
@@ -168,7 +172,7 @@ class TracerWidget(CustomWidget):
             self.show_selected_chunk()
 
     def enable_tracing(self):
-        self.tracer = HeapTracer(self)
+        self.tracer = HeapTracer(self, not self.cb_stop_during_tracing.isChecked())
         self.tracer.hook()
         self.parent.tracer = self.tracer 
         log("Tracer enabled")
@@ -182,8 +186,10 @@ class TracerWidget(CustomWidget):
 
     def cb_tracing_changed(self, state):
         if state == QtCore.Qt.Checked:
+            self.cb_stop_during_tracing.setEnabled(False)
             self.enable_tracing()
         else:
+            self.cb_stop_during_tracing.setEnabled(True)
             self.disable_tracing()
 
     def btn_dump_trace_on_click(self):

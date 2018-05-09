@@ -12,7 +12,7 @@ from misc import *
 
 # -----------------------------------------------------------------------
 class HeapTracer(DBG_Hooks):
-    def __init__(self, form):
+    def __init__(self, form, resume=True):
         DBG_Hooks.__init__(self)
         self.malloc_addr    = None
         self.free_addr      = None
@@ -22,7 +22,8 @@ class HeapTracer(DBG_Hooks):
         self.regs           = None
         self.malloc_callers = {}
         self.free_callers   = {}
-        self.form           = form        
+        self.form           = form  
+        self.resume         = resume      
         self.initialize()
 
     def initialize(self):
@@ -70,6 +71,9 @@ class HeapTracer(DBG_Hooks):
             self.malloc_callers[ret_addr] = req_size
             request_step_until_ret()
             run_requests()
+            if self.resume:
+                request_continue_process()
+                run_requests()
 
         if bptea == self.free_addr:
             ret_addr = self.get_return_address()
@@ -77,6 +81,9 @@ class HeapTracer(DBG_Hooks):
             self.free_callers[ret_addr] = free_chunk
             request_step_until_ret()
             run_requests()
+            if self.resume:
+                request_continue_process()
+                run_requests()
         return 0
 
     def remove_bps(self):
