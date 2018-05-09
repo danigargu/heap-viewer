@@ -370,7 +370,7 @@ class ChunkWidget(CustomWidget):
     def show_chunk(self, expr):
         if type(expr) == str:
             self.t_chunk_addr.setText(expr)
-        elif type(expr) == int:
+        elif type(expr) == int or type(expr) == long:
             self.t_chunk_addr.setText("0x%x" % expr)
         self.view_chunk_on_click()
 
