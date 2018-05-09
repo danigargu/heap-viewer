@@ -40,7 +40,7 @@ class HeapViewPlugin(idaapi.plugin_t):
     def run(self, arg=0):
         try:
             if "ELF" not in get_file_type_name():
-                raise Exception("Executable must be ELF fomat")
+                raise Exception("Executable must be ELF format")
 
             if not is_debugger_on() or not idaapi.dbg_can_query():
                 raise Exception("The debugger must be active and suspended before using this plugin")
