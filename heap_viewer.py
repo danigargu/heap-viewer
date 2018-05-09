@@ -5,6 +5,8 @@
 #
 
 import idaapi
+import os
+import sys
 
 PLUGIN_DIR = idaapi.idadir(os.path.join("plugins", "heap_viewer"))
 sys.path.append(PLUGIN_DIR)
