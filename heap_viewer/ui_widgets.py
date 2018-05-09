@@ -108,9 +108,9 @@ class TracerWidget(CustomWidget):
         self._create_menu()     
 
     def _create_table(self):
-        self.tbl_traced_chunks = TTable(['#','User-address', 'Action', 'Req. size', 'Caller', 'Caller address'])
+        self.tbl_traced_chunks = TTable(['#','User-address', 'Action', 'Arg 1', 'Arg 2', 'Caller', 'Caller address'])
         self.tbl_traced_chunks.setRowCount(0)
-        self.tbl_traced_chunks.resize_columns([40, 155, 80, 80, 200, 200])
+        self.tbl_traced_chunks.resize_columns([40, 155, 80, 80, 80, 200, 200])
         self.tbl_traced_chunks.customContextMenuRequested.connect(self.context_menu)
         self.tbl_traced_chunks.itemSelectionChanged.connect(self.show_selected_chunk)
 
@@ -164,7 +164,7 @@ class TracerWidget(CustomWidget):
             idc.Jump(chunk_addr)
 
         elif action == goto_caller:
-            caller_addr = sender.item(sender.currentRow(), 5).text()
+            caller_addr = sender.item(sender.currentRow(), 6).text()
             if caller_addr:
                 idc.Jump(int(caller_addr, 16))
 
@@ -176,7 +176,7 @@ class TracerWidget(CustomWidget):
         self.tracer.hook()
         self.parent.tracer = self.tracer 
         log("Tracer enabled")
-
+    
     def disable_tracing(self):
         if self.tracer:
             self.tracer.remove_bps()
@@ -209,28 +209,31 @@ class TracerWidget(CustomWidget):
         norm_address = "0x%x-0x%x" % (chunk_addr, self.heap.ptr_size * 2)
         self.parent.show_chunk_info(norm_address)
 
-    def append_traced_chunk(self, addr, action, reqsize, caller):
+    def append_traced_chunk(self, addr, action, arg1, arg2, caller):
         num_rows = self.tbl_traced_chunks.rowCount()
 
         self.tbl_traced_chunks.setSortingEnabled(False)
         self.tbl_traced_chunks.insertRow(num_rows)
 
         caller_name_offset = get_func_name_offset(caller)
-        reqsize = "0x%x" % reqsize if reqsize else 'N/A'
+        arg1 = "0x%x" % arg1 if arg1 else 'N/A'
+        arg2 = "0x%x" % arg2 if arg2 else 'N/A'
 
         it_count  = QTableWidgetItem("%d" % num_rows)
         it_chunk  = QTableWidgetItem("0x%x" % addr)
         it_action = QTableWidgetItem("%s" % action)
-        it_reqsize = QTableWidgetItem(reqsize)
+        it_arg1 = QTableWidgetItem(arg1)
+        it_arg2 = QTableWidgetItem(arg2)
         it_caller = QTableWidgetItem("%s" % caller_name_offset)
         it_caller_a = QTableWidgetItem("0x%x" % caller)
         
         self.tbl_traced_chunks.setItem(num_rows, 0, it_count)
         self.tbl_traced_chunks.setItem(num_rows, 1, it_chunk)
         self.tbl_traced_chunks.setItem(num_rows, 2, it_action)
-        self.tbl_traced_chunks.setItem(num_rows, 3, it_reqsize)
-        self.tbl_traced_chunks.setItem(num_rows, 4, it_caller)
-        self.tbl_traced_chunks.setItem(num_rows, 5, it_caller_a)
+        self.tbl_traced_chunks.setItem(num_rows, 3, it_arg1)
+        self.tbl_traced_chunks.setItem(num_rows, 4, it_arg2)
+        self.tbl_traced_chunks.setItem(num_rows, 5, it_caller)
+        self.tbl_traced_chunks.setItem(num_rows, 6, it_caller_a)
         
         self.tbl_traced_chunks.resizeRowsToContents()
         self.tbl_traced_chunks.setSortingEnabled(True)
