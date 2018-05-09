@@ -1,13 +1,15 @@
 {
-	"libc_offsets":
-	{
-	  "32": {
-	    "global_max_fast": 1784032,
-	    "main_arena": 1779584
-	  },
-	  "64": {
-	    "global_max_fast": 3958776,
-	    "main_arena": 3951392
-	  }
-	}
+  "libc_offsets": {
+    "32": {
+      "global_max_fast": 1784032,
+      "main_arena": 1779584,
+      "mp_": 1777952
+    },
+    "64": {
+      "global_max_fast": 3958776,
+      "main_arena": 3951392,
+      "mp_": 3948896
+    }
+  },
+  "libc_version": "2.23"
 }
