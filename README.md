@@ -14,7 +14,7 @@ Currently only supports glibc malloc (ptmalloc2).
 
 ## Features
 
-* Heap tracer (malloc/free)
+* Heap tracer (malloc/free/calloc/realloc)
 * Malloc chunk info
 * Multi-arena info (chunks, top, last-remainder)
 * Bins info (fastbins, unsortedbin, smallbins y largebins)
