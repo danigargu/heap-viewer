@@ -163,6 +163,24 @@ def get_libc_base():
     return None
 
 # --------------------------------------------------------------------------
+def get_libc_module():
+    mod_iter = Modules()
+    for m in mod_iter:
+        if re.search(r"libc-.*\.so$", m.name):
+            next_m = next(mod_iter)
+            return (m.base, next_m.base) # start/end
+    return None
+
+# --------------------------------------------------------------------------
+def get_libc_names():
+    libc_module = get_libc_module()
+    if libc_module:
+        names = get_debug_names(*libc_module)
+        # invert dict to name:address
+        return {v: k for k, v in names.iteritems()}
+    return None
+
+# --------------------------------------------------------------------------
 def get_func_name_offset(ea):
     func = idaapi.get_func(ea)
     if func:
@@ -179,6 +197,17 @@ def addr_by_name_expr(name):
         if addr != BADADDR:
             name = name.replace(sym_name, str(addr))
             return int(eval(name))
+    return None
+
+# --------------------------------------------------------------------------
+def parse_name_expr(name):
+    m = re.match(r"([\w]+)([\+\-][0x\d]+)?", name)
+    if m:
+        values = m.groups()
+        if len(values) == 2:
+            if values[1] is not None:
+                return (values[0], eval(values[1]))
+            return (values[0], 0)
     return None
 
 # --------------------------------------------------------------------------

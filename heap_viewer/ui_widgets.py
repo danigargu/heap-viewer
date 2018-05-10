@@ -1232,6 +1232,7 @@ class HouseOfForceWidget(CustomWidget):
 class LibcOffsetsWidget(CustomWidget):
     def __init__(self, parent=None):
         CustomWidget.__init__(self, parent)
+        self.libc_base = None
         self._create_gui()
         self.populate_table()
 
@@ -1278,20 +1279,16 @@ class LibcOffsetsWidget(CustomWidget):
             sender.copy_selected_row()
 
         elif action == action_jump_to:
-            # TODO: Refactor
-            libc_base = get_libc_base()
+
             offset = int(sender.item(sender.currentRow(), 1).text(), 16)
 
-            address = libc_base + offset
+            address = self.libc_base + offset
             idc.Jump(address)
 
     def tbl_offsets_double_clicked(self):
         sender = self.sender()
-
-        # TODO: Refactor
-        libc_base = get_libc_base()
         offset = int(sender.item(sender.currentRow(), 1).text(), 16)
-        address = libc_base + offset
+        address = self.libc_base + offset
         idc.Jump(address)
 
     def populate_table(self):
@@ -1330,7 +1327,7 @@ class LibcOffsetsWidget(CustomWidget):
     def get_libc_offsets(self):        
         libc_symbols = {
             'variables': [
-                'environ',
+                '__environ',
                 '__free_hook',
                 '__malloc_hook',
                 '__realloc_hook',
@@ -1345,7 +1342,7 @@ class LibcOffsetsWidget(CustomWidget):
                 'open',
                 'read',
                 'write',
-                'gets',
+                '_IO_gets',
                 'setcontext+0x35',
             ]
         }
@@ -1354,13 +1351,25 @@ class LibcOffsetsWidget(CustomWidget):
             'functions': OrderedDict(),
 
         }
-        libc_base = get_libc_base()
+        
+        self.libc_base = get_libc_base()
+        libc_names = get_libc_names()
+
         for s_type, symbols in libc_symbols.iteritems():
             for sym in symbols:
-                addr = addr_by_name_expr(sym)
+
+                name_expr = parse_name_expr(sym)
+                if not name_expr:
+                    continue
+
+                name, offset = name_expr
+                addr = libc_names.get(name)
+
                 if addr:
-                    offset = addr - libc_base
+                    addr += offset
+                    offset = addr - self.libc_base
                     result[s_type][sym] = offset
+                    
         return result
         
 # -----------------------------------------------------------------------
