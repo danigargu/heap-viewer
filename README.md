@@ -123,7 +123,14 @@ $ LD_PRELOAD=./libc_64.so.6 ./main_arena_offset
 
 ## CONTRIBUITORS :beer:
 
-Special mention to my colleagues @soez, @wagiro and @DiaLluvioso for give me some ideas during the development of the plugin. And of course, the @pwndbg project, from which I picked up some things about heap parsing.
+Special mention to my colleagues [soez][soez], [wagiro][wagiro] and [DiaLluvioso][DiaLluvioso] for give me some ideas during the development of the plugin. And of course, the [@pwndbg](https://github.com/pwndbg/pwndbg/) project, from which I picked up some things about heap parsing.
+
+[Contributors](https://github.com/danigargu/heap-viewer/graphs/contributors)
+
+[soez]: https://twitter.com/javierprtd
+[wagiro]: https://twitter.com/egarme
+[DiaLluvioso]: https://twitter.com/Manuelbp01
+
 
 ## BUGS / FEEDBACK / PRs
 
