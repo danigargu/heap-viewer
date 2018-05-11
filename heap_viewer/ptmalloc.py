@@ -380,7 +380,7 @@ class Heap(object):
             return min_size
         return size & ~self.malloc_align_mask
 
-    def generic_chain(self, address, offset, stop=0, limit=100):
+    def generic_chain(self, address, offset, stop, add_stop=True, limit=100):
         count = 0
         result = [address]
         b_error = False
@@ -402,17 +402,17 @@ class Heap(object):
             next_addr = self.get_ptr(next_addr + offset)
             count += 1
 
-        if next_addr == stop:
+        if next_addr == stop and add_stop:
             result.append(stop)
 
         return (result, b_error)
 
-    def chunk_chain(self, address, stop=0):
+    def chunk_chain(self, address, stop=0, add_stop=True):
         offset = self.chunk_member_offset('fd')
-        return self.generic_chain(address, offset, stop)
+        return self.generic_chain(address, offset, stop, add_stop)
 
-    def tcache_chain(self, address):
-        return self.generic_chain(address, offset=0) # offset 0: next
+    def tcache_chain(self, address, add_stop=True):
+        return self.generic_chain(address, 0, 0, add_stop) # offset 0: next
 
     def get_struct(self, address, struct_type):
         sbytes = get_bytes(address, sizeof(struct_type))

@@ -997,10 +997,11 @@ class TcacheWidget(CustomWidget):
         sender = self.sender()
         items = sender.selectedItems()
 
-        entry_addr = int(items[3].text(), 16)
-        entry_size = int(items[1].text(), 16)
-        self.show_chain(entry_addr, entry_size)
-
+        if items and len(items):
+            entry_addr = int(items[3].text(), 16)
+            entry_size = int(items[1].text(), 16)
+            self.show_chain(entry_addr, entry_size)
+            
 
     def show_selected_chunk(self):
         items = self.sender().selectedItems()

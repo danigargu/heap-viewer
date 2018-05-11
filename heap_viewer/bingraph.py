@@ -44,6 +44,7 @@ class BinGraph(idaapi.GraphViewer):
     def warning_line(self, txt):
         return idaapi.COLSTR(txt, idaapi.SCOLOR_ERROR)
 
+
     def chunk_info(self, chunk_addr, chunk):
         line1 = idaapi.COLSTR("Chunk ", idaapi.SCOLOR_NUMBER)
         line2 = idaapi.COLSTR("0x%x\n\n" % (chunk_addr), idaapi.SCOLOR_INSN)
@@ -51,118 +52,85 @@ class BinGraph(idaapi.GraphViewer):
                 (chunk.size, chunk.fd, SegName(chunk.fd), ), SCOLOR_DEFAULT)
         return line1 + line2 + line3
 
-    def tcache_info(self, next_addr):
-        line1 = idaapi.COLSTR("next: ", idaapi.SCOLOR_NUMBER)
-        line2 = idaapi.COLSTR("0x%x" % (next_addr), idaapi.SCOLOR_INSN)
-        return line1 + line2
+
+    def tcache_info(self, entry_addr, chunk_addr):        
+        line1 = idaapi.COLSTR("entry: ", idaapi.SCOLOR_NUMBER)
+        line2 = idaapi.COLSTR("0x%x\n" % (entry_addr), idaapi.SCOLOR_INSN)
+        line3 = idaapi.COLSTR("chunk: ", idaapi.SCOLOR_NUMBER)
+        line4 = idaapi.COLSTR("0x%x" % (chunk_addr), idaapi.SCOLOR_INSN)
+        return line1 + line2 + line3 + line4
+
 
     def make_fastbin_graph(self):
+        fastbin_id = self.info['fastbin_id']
+        size = self.info['size']
 
-        fastbin_id, size = self.info['fastbin_id'], self.info['size']
-
-        fastbin = self.heap.get_fastbin_by_id(fastbin_id)
-        address = [fastbin]
-
-        line1 = idaapi.COLSTR("FASTBIN - 0x%02X" % size, idaapi.SCOLOR_ERROR)
-        id_header = self.AddNode( (True, "fastbin[%x]" % size, "FASTBIN - 0x%02X" % size) )         
-
-        chunk = self.heap.get_chunk(fastbin)
-        id_parent = self.AddNode( (True, str(chunk), self.chunk_info(fastbin, chunk)) )
-
-        self.AddEdge(id_header, id_parent)
-
-        breaked = False
-        id_chunk = None
-
-        while chunk.fd != 0:
-            fastbin_ea = chunk.fd # current chunk
-            if address.count(fastbin_ea) >= 2:
-                breaked = True
-                break
-
-            address.append(fastbin_ea)
-            chunk = self.heap.get_chunk(chunk.fd)            
-            id_chunk = self.AddNode( (True, str(chunk), self.chunk_info(fastbin_ea, chunk)) )
-            self.AddEdge(id_parent, id_chunk)
-            id_parent = id_chunk
-
-        if breaked: 
-            warn = self.warning_line("[...] - List corrupted or infinite cycle detected")
-            id_end = self.AddNode( (True, "[...]", warn) )
-            self.AddEdge(id_parent, id_end)            
-        else: 
-            id_end = self.AddNode( (True, "TAIL - 0", "TAIL") )
-            self.AddEdge(id_parent, id_end)
-            
-        return True
-
-
-    def make_tcache_graph(self):        
-        entry_id   = self.info['bin_id']
-        entry_size = self.info['size']
-
-        tcache_entry  = self.heap.get_tcache_entry_by_id(entry_id)
-        tcache_header = "TCACHE[%d] - 0x%02X\nCounts: %d\n" % (entry_id, entry_size, tcache_entry['counts'])
-        id_header = self.AddNode( (True, tcache_header, tcache_header) )     
-
-        chunk_addr = tcache_entry['next'] - (self.heap.ptr_size * 2)
-
-        chunk_info = "Chunk address: 0x%x\n" % chunk_addr
-        chunk_info += "-" * 20 + "\n"
-        chunk_info += str(chunk)
-
-        chunk = self.heap.get_chunk(chunk_addr)
-        id_parent = self.AddNode( (True, chunk_info, self.tcache_info(tcache_entry['next'])) )
-
-        self.AddEdge(id_header, id_parent)
-
-        address = [chunk_addr]
-        breaked = False
-        id_chunk = None
-
-        while chunk.fd != 0:
-            next_entry = chunk.fd # current chunk
-            if address.count(next_entry) >= 2:
-                breaked = True
-                break
-
-            address.append(next_entry)
-            chunk_addr = chunk.fd - (self.heap.ptr_size * 2)
-
-            chunk = self.heap.get_chunk(chunk_addr)     
-
-            chunk_info = "Chunk address: 0x%x\n" % chunk_addr
-            chunk_info += "-" * 20 + "\n"
-            chunk_info += str(chunk)
-
-            id_chunk = self.AddNode( (True, chunk_info, self.tcache_info(next_entry)) )
-            self.AddEdge(id_parent, id_chunk)
-            id_parent = id_chunk
-
-        if breaked: 
-            warn = self.warning_line("[...] - List corrupted or infinite cycle detected")
-            id_end = self.AddNode( (True, "[...]", warn) )
-            self.AddEdge(id_parent, id_end)
-            
-        else: 
-            # add TAIL
-            id_end = self.AddNode( (True, "TAIL - 0", "TAIL") )
-            self.AddEdge(id_parent, id_end)
-
-        return True
-
-    def make_fastbin_graph2(self):
-        fastbin_id, size = self.info['fastbin_id'], self.info['size']
         fastbin = self.heap.get_fastbin_by_id(fastbin_id)
 
         if fastbin == 0:
             warning("Empty fastbin entry")
             return False
 
-        chain, error = self.heap.chunk_chain(fastbin, stop=0)
-        for chunk in chain:
-            print "fastbin - 0x%x" % chunk
+        line1 = idaapi.COLSTR("FASTBIN - 0x%02X" % size, idaapi.SCOLOR_ERROR)
+        id_header = self.AddNode( (True, "fastbin[%x]" % size, "FASTBIN - 0x%02X" % size) )  
+        id_chunk = id_header
 
+        chain, c_error = self.heap.chunk_chain(fastbin, stop=0, add_stop=False)
+
+        for i, chunk_addr in enumerate(chain):
+            chunk_info = self.heap.get_chunk(chunk_addr)
+
+            prev_chunk = id_chunk
+            id_chunk = self.AddNode( (True, str(chunk_info), self.chunk_info(chunk_addr, chunk_info)) )
+            self.AddEdge(prev_chunk, id_chunk)
+
+        if c_error: 
+            warn = self.warning_line("[...] - List corrupted or infinite cycle detected")
+            id_end = self.AddNode( (True, "[...]", warn) )
+            self.AddEdge(id_chunk, id_end)            
+        else: 
+            id_end = self.AddNode( (True, "TAIL - 0", "TAIL") )
+            self.AddEdge(id_chunk, id_end)
+
+        return True
+
+
+    def make_tcache_graph(self):
+        entry_id   = self.info['bin_id']
+        entry_size = self.info['size']
+
+        tcache_entry = self.heap.get_tcache_entry_by_id(entry_id)
+
+        if not tcache_entry:
+            warning("Unable to get tcache entry")
+            return False
+
+        line_header = "TCACHE[%d] - 0x%02X\nCounts: %d\n" % (entry_id, entry_size, tcache_entry['counts'])
+        id_header = self.AddNode( (True, line_header, line_header) )
+        id_chunk = id_header
+
+        chain, c_error = self.heap.tcache_chain(tcache_entry['next'], add_stop=False)
+
+        for i, mem_addr in enumerate(chain):
+            chunk_addr = self.heap.mem2chunk(mem_addr)
+            chunk_info = self.heap.get_chunk(chunk_addr)
+
+            prev_chunk = id_chunk
+            id_chunk = self.AddNode( (True, str(chunk_info), self.tcache_info(mem_addr, chunk_addr)) )
+            self.AddEdge(prev_chunk, id_chunk)
+
+        if c_error: 
+            warn = self.warning_line("[...] - List corrupted or infinite cycle detected")
+            id_end = self.AddNode( (True, "[...]", warn) )
+            self.AddEdge(id_chunk, id_end)
+            
+        else: 
+            id_end = self.AddNode( (True, "TAIL - 0", "TAIL") )
+            self.AddEdge(id_chunk, id_end)
+
+        return True
+
+    
     def make_bin_graph(self):
         id_node = dict()
         bin_base = self.info['bin_base']
@@ -211,6 +179,7 @@ class BinGraph(idaapi.GraphViewer):
     def OnGetText(self, node_id):
         is_thread, value, label = self[node_id]
         if is_thread:
+            #return (label, 0xf5f5f5)
             return (label, 0xf5f5f5)
         return label
 

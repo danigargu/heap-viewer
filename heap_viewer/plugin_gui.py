@@ -12,11 +12,19 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtWidgets import QWidget, QSplitter, QTabWidget, QPushButton, QComboBox
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel
 
+# ----- Only for develop / reload modules -------------------------------
+
+require('ptmalloc')
+require('tracer')
+require('bingraph')
+require('misc')
+require('ui_widgets')
+
+# -----------------------------------------------------------------------
+
 from ptmalloc import Heap
 from tracer import HeapTracer
 from bingraph import BinGraph
-
-require('ui_widgets')
 
 from misc import *
 from ui_widgets import *

@@ -11,13 +11,7 @@ import sys
 PLUGIN_DIR = idaapi.idadir(os.path.join("plugins", "heap_viewer"))
 sys.path.append(PLUGIN_DIR)
 
-# ----- Only for develop / reload modules -------------------------------
-
-idaapi.require('ptmalloc')
 idaapi.require('plugin_gui')
-idaapi.require('tracer')
-idaapi.require('misc')
-idaapi.require('bingraph')
 
 #------------------------------------------------------------------------
 
