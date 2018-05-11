@@ -97,6 +97,11 @@ $ LD_PRELOAD=./libc_64.so.6 ./main_arena_offset
 ![fastbin graph](https://user-images.githubusercontent.com/1675387/39918437-b5e49562-5510-11e8-8437-86da11eb466f.png)
 
 
+**Tcache graph**
+
+![tcache graph](https://user-images.githubusercontent.com/1675387/39926350-3dbbc7e4-552f-11e8-99f9-72e5dd99d421.png)
+
+
 **Find fake fastbin**
 
 ![Find fake fastbin](https://user-images.githubusercontent.com/1675387/39698662-f661b11a-51f5-11e8-8796-c852252bd75a.png)
