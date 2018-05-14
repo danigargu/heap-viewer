@@ -40,8 +40,9 @@ class TTable(QTableWidget):
         self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
     def copy_selected_value(self):
-        value = self.currentItem().text()
-        QtWidgets.QApplication.clipboard().setText(value)
+        item = self.currentItem()
+        if item:
+            QtWidgets.QApplication.clipboard().setText(item.text())
 
     def copy_selected_row(self):
         selection = self.selectionModel()
@@ -523,6 +524,7 @@ class ArenaWidget(CustomWidget):
 class BinsWidget(CustomWidget):
     def __init__(self, parent=None):
         CustomWidget.__init__(self, parent)
+        self.show_bases = False
         self._create_gui()
 
     def _create_gui(self):
@@ -628,12 +630,12 @@ class BinsWidget(CustomWidget):
         view_chunk = menu.addAction("View chunk")
         jump_to = menu.addAction("Jump to")
         graphview_action = menu.addAction("GraphView")
+        self.show_uninit = menu.addAction("Show uninitialized bins (bases)")
+        self.show_uninit.setCheckable(True)
+        self.show_uninit.setChecked(self.show_bases)
 
         action = menu.exec_(sender.mapToGlobal(position))
 
-        addr_field = self.bin_tables[sender]['address']
-        chunk_addr = int(sender.item(sender.currentRow(), addr_field).text(), 16)
-       
         if action == copy_action:
             sender.copy_selected_value()
 
@@ -641,10 +643,14 @@ class BinsWidget(CustomWidget):
             sender.copy_selected_row()
 
         elif action == jump_to:
-            idc.Jump(chunk_addr)
+            self.jmp_to_selected_chunk()
 
         elif action == view_chunk:
             self.show_selected_chunk()
+
+        elif action == self.show_uninit:
+            self.show_bases = self.show_uninit.isChecked()
+            self.populate_tables()
 
         elif action == graphview_action:
 
@@ -711,12 +717,17 @@ class BinsWidget(CustomWidget):
                 graph.Show()
 
 
+
     def show_bin_chain(self):
         sender = self.sender()
         stop = 0
         size = None
 
         row = sender.selectedItems()
+
+        if not len(row):
+            return
+
         bin_cols = self.bin_tables[sender]
         address = int(row[bin_cols['address']].text(), 16)
 
@@ -730,12 +741,23 @@ class BinsWidget(CustomWidget):
 
 
     def show_selected_chunk(self):
+        chunk_addr = self.get_selected_chunk_addr()
+        if chunk_addr:
+            self.parent.show_chunk_info(chunk_addr)
+
+    def jmp_to_selected_chunk(self):
+        chunk_addr = self.get_selected_chunk_addr()
+        if chunk_addr:
+            idc.Jump(chunk_addr)
+
+    def get_selected_chunk_addr(self):
         sender = self.sender()
         items = sender.selectedItems()
-        col_id = self.bin_tables[sender]['address']
-        address = int(items[col_id].text(), 16)
-        self.parent.show_chunk_info(address)
-      
+        if len(items):
+            col_id = self.bin_tables[sender]['address']
+            address = int(items[col_id].text(), 16)
+            return address
+        return None
 
     def table_on_change(self):
         self.show_selected_chunk()
@@ -745,14 +767,13 @@ class BinsWidget(CustomWidget):
         if size:
             title = '%s[0x%02x]' % (title, size)
 
-        chain, b_error = self.heap.chunk_chain(address, stop)
-        html_chain = make_html_chain(title, chain, b_error)
-        self.te_chain_info.clear()
-        self.te_chain_info.insertHtml(html_chain)
-
+        if address != 0 and address != BADADDR:
+            chain, b_error = self.heap.chunk_chain(address, stop)
+            html_chain = make_html_chain(title, chain, b_error)
+            self.te_chain_info.clear()
+            self.te_chain_info.insertHtml(html_chain)
 
     def populate_tbl_fastbins(self): 
-
         self.tbl_fastbins.clearContents()
         self.tbl_fastbins.setRowCount(0)
         self.tbl_fastbins.setSortingEnabled(False)
@@ -761,7 +782,7 @@ class BinsWidget(CustomWidget):
         fastbins = self.heap.get_fastbins(self.cur_arena)
         for id_fast, (size, fast_chunk) in enumerate(fastbins.iteritems()):
 
-            if not fast_chunk:
+            if not self.show_bases and fast_chunk == 0:
                 continue
 
             self.tbl_fastbins.insertRow(idx)
@@ -788,7 +809,7 @@ class BinsWidget(CustomWidget):
         self.tbl_unsortedbin.setRowCount(0)
 
         # points to current base
-        if fd == base:
+        if not self.show_bases and fd == base:
             return
 
         self.tbl_unsortedbin.setSortingEnabled(False)
@@ -820,7 +841,7 @@ class BinsWidget(CustomWidget):
         for bin_id, smallbin in smallbins.iteritems():
 
             # point to himself
-            if smallbin['base'] == smallbin['fd']:
+            if not self.show_bases and smallbin['base'] == smallbin['fd']:
                 continue
 
             self.tbl_smallbins.insertRow(idx)
@@ -854,7 +875,7 @@ class BinsWidget(CustomWidget):
         for bin_id, largebin in largebins.iteritems():
 
             # point to himself
-            if largebin['base'] == largebin['fd']:
+            if not self.show_bases and largebin['base'] == largebin['fd']:
                 continue
   
             self.tbl_largebins.insertRow(idx)
