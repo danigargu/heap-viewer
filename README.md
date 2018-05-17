@@ -25,6 +25,7 @@ Currently only supports glibc malloc (ptmalloc2).
   * Fake fastbin finder
   * House of force helper
   * Useful libc offsets
+  * Calc chunk size (request2size)
 
 ## Install
 

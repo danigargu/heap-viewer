@@ -1314,7 +1314,6 @@ class LibcOffsetsWidget(CustomWidget):
         idc.Jump(address)
 
     def populate_table(self):
-
         self.tbl_offsets_vars.clearContents()
         self.tbl_offsets_funcs.clearContents()
 
@@ -1489,6 +1488,7 @@ class MagicWidget(CustomWidget):
         self.cb_magic.addItem('Find fake fast', 0)
         self.cb_magic.addItem('House of force helper', 0)
         self.cb_magic.addItem('Useful libc offsets')
+        self.cb_magic.addItem('Calc chunk size')
         self.cb_magic.currentIndexChanged[int].connect(self.cb_magic_changed)
 
         self.stacked_magic = QtWidgets.QStackedWidget()
@@ -1497,11 +1497,13 @@ class MagicWidget(CustomWidget):
         self.fakefast_widget = FakefastWidget(self)
         self.house_of_force_widget = HouseOfForceWidget(self)
         self.libc_offsets_widget = LibcOffsetsWidget(self)
+        self.req2size_widget = Req2sizeWidget(self)
 
         self.stacked_magic.addWidget(self.unlink_widget)
         self.stacked_magic.addWidget(self.fakefast_widget)
         self.stacked_magic.addWidget(self.house_of_force_widget)
         self.stacked_magic.addWidget(self.libc_offsets_widget)
+        self.stacked_magic.addWidget(self.req2size_widget)
 
         hbox_magic = QHBoxLayout()
         hbox_magic.addWidget(QLabel('Select util'))
@@ -1564,5 +1566,66 @@ class ConfigWidget(CustomWidget):
             warning("Error: %s" % traceback.format_exc())
 
 # -----------------------------------------------------------------------
+class Req2sizeWidget(CustomWidget):
+    def __init__(self, parent=None):
+        CustomWidget.__init__(self, parent)
+        self._create_gui()
 
+    def _create_gui(self):
+        self.t_req2size = QtWidgets.QLineEdit()
+        self.t_req2size.setFixedWidth(150)
 
+        self.t_req2size_info = QtWidgets.QTextEdit()
+        self.t_req2size_info.setReadOnly(True)
+
+        self.btn_req2size = QtWidgets.QPushButton("Calc chunk size")
+        self.btn_req2size.clicked.connect(self.btn_req2size_on_click)
+
+        hbox_req2size = QHBoxLayout()
+        hbox_req2size.addWidget(QLabel('Request size'))
+        hbox_req2size.addWidget(self.t_req2size)
+        hbox_req2size.addWidget(self.btn_req2size)
+        hbox_req2size.addStretch(1)
+
+        vbox_req2size = QVBoxLayout()
+        vbox_req2size.addLayout(hbox_req2size)
+        vbox_req2size.addWidget(self.t_req2size_info)
+        vbox_req2size.addStretch(1)
+
+        vbox_req2size.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(vbox_req2size)
+
+    def btn_req2size_on_click(self):
+        req_size = eval(self.t_req2size.text())
+
+        min_chunk_size = self.heap.min_chunk_size
+        malloc_alignment = self.heap.malloc_alignment
+        size = self.heap.request2size(req_size)
+
+        html_result = '''
+        <style>
+            td {padding-right: 20px;}
+            body {width: 100%%;}
+        </style>
+
+        <table>
+            <tr>
+                <td><b>Min chunk size</b></td>
+                <td>0x%x (%d)</td>
+            </tr>
+            <tr>
+                <td><b>Malloc alignment</b></td>
+                <td>0x%x (%d)</td>
+            </tr>
+            <tr>
+                <td><b>Chunk size</b></td>
+                <td>0x%x (%d)</td>
+            </tr>
+        </table>
+        ''' % (min_chunk_size,min_chunk_size, malloc_alignment, 
+            malloc_alignment, size, size)
+
+        self.t_req2size_info.clear()
+        self.t_req2size_info.insertHtml(html_result)
+
+# -----------------------------------------------------------------------
