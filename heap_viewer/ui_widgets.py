@@ -11,6 +11,7 @@ from idc import *
 from idautils import *
 from idaapi import *
 
+from ctypes import *
 from collections import OrderedDict
 
 from PyQt5 import QtGui, QtCore, QtWidgets
@@ -22,6 +23,7 @@ from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
 from misc import *
 from tracer import HeapTracer
 from bingraph import BinGraph
+from io_file import parse_io_file_struct
 
 # -----------------------------------------------------------------------
 class TTable(QTableWidget):
@@ -1489,6 +1491,7 @@ class MagicWidget(CustomWidget):
         self.cb_magic.addItem('House of force helper', 0)
         self.cb_magic.addItem('Useful libc offsets')
         self.cb_magic.addItem('Calc chunk size')
+        self.cb_magic.addItem('IO_FILE structs')
         self.cb_magic.currentIndexChanged[int].connect(self.cb_magic_changed)
 
         self.stacked_magic = QtWidgets.QStackedWidget()
@@ -1498,12 +1501,14 @@ class MagicWidget(CustomWidget):
         self.house_of_force_widget = HouseOfForceWidget(self)
         self.libc_offsets_widget = LibcOffsetsWidget(self)
         self.req2size_widget = Req2sizeWidget(self)
+        self.io_file_widget = IOFileWidget(self)
 
         self.stacked_magic.addWidget(self.unlink_widget)
         self.stacked_magic.addWidget(self.fakefast_widget)
         self.stacked_magic.addWidget(self.house_of_force_widget)
         self.stacked_magic.addWidget(self.libc_offsets_widget)
         self.stacked_magic.addWidget(self.req2size_widget)
+        self.stacked_magic.addWidget(self.io_file_widget)
 
         hbox_magic = QHBoxLayout()
         hbox_magic.addWidget(QLabel('Select util'))
@@ -1513,7 +1518,7 @@ class MagicWidget(CustomWidget):
         self.vbox_magic = QVBoxLayout()
         self.vbox_magic.addLayout(hbox_magic)
         self.vbox_magic.addWidget(self.stacked_magic)
-        self.vbox_magic.addStretch(1)
+        #self.vbox_magic.addStretch(1)
 
         self.setLayout(self.vbox_magic)
 
@@ -1553,7 +1558,6 @@ class ConfigWidget(CustomWidget):
             self.t_config.setText(self.parent.config.dump_config())
         except:
             self.t_config.setText('')
-
 
     def update_config_on_click(self):
         try:
@@ -1629,3 +1633,143 @@ class Req2sizeWidget(CustomWidget):
         self.t_req2size_info.insertHtml(html_result)
 
 # -----------------------------------------------------------------------
+class IOFileWidget(CustomWidget):
+    def __init__(self, parent=None):
+        CustomWidget.__init__(self, parent)
+        self._create_gui()
+        self.cb_struct_changed(0)
+
+    def _create_gui(self):
+        self.t_io_file = QtWidgets.QTextEdit()
+        self.t_io_jump_t = QtWidgets.QTextEdit()
+        self.t_io_file.setReadOnly(True)
+        self.t_io_jump_t.setReadOnly(True)
+
+        self.cb_struct = QtWidgets.QComboBox()
+        self.cb_struct.setFixedWidth(200)
+
+        io_structs = [
+            '_IO_2_1_stdin_',
+            '_IO_2_1_stdout_',
+            '_IO_2_1_stderr_'
+        ]
+        for i, name in enumerate(io_structs):
+            self.cb_struct.addItem(name, i)
+
+        self.cb_struct.currentIndexChanged[int].connect(self.cb_struct_changed)
+
+        self.t_struct_addr = QtWidgets.QLineEdit()
+        self.t_struct_addr.setFixedWidth(150)
+        self.btn_parse_struct = QtWidgets.QPushButton('Show')
+        self.btn_parse_struct.clicked.connect(self.show_struct_on_click)
+
+        hbox_io_struct = QHBoxLayout()
+        hbox_io_struct.addWidget(QLabel('Struct:'))
+        hbox_io_struct.addWidget(self.cb_struct)
+        hbox_io_struct.addWidget(QLabel('Address:'))
+        hbox_io_struct.addWidget(self.t_struct_addr)
+        hbox_io_struct.addWidget(self.btn_parse_struct)
+        hbox_io_struct.addStretch(1)
+
+        hbox_result = QtWidgets.QGridLayout()
+        hbox_result = QHBoxLayout()
+        hbox_result.addWidget(self.t_io_file)
+        hbox_result.addWidget(self.t_io_jump_t)
+
+        vbox_req2size = QVBoxLayout()
+        vbox_req2size.addLayout(hbox_io_struct)
+        vbox_req2size.addLayout(hbox_result)
+
+        vbox_req2size.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(vbox_req2size)
+        
+    def cb_struct_changed(self, idx):
+        struct_name = str(self.cb_struct.currentText())
+        address = LocByName(struct_name)
+        if address != BADADDR:
+            self.t_struct_addr.setText("0x%x" % address)
+            self.show_struct(address, struct_name)
+
+    def show_struct_on_click(self):
+        try:
+            address = int(self.t_struct_addr.text(), 16)
+            self.show_struct(address, "_IO_FILE")
+        except:
+            warning("ERROR: Invalid address")
+
+    def html_chunk_table(self, chunk):
+        chunk_table = '<table>'
+        offset = 0
+        for name, ctype in chunk._fields_:
+            value = getattr(chunk, name)
+
+            if ctype in [c_uint32, c_uint64]:
+                value = "0x%x" % value
+            if ctype is c_char:
+                value = "0x%x" % ord(value)
+
+            chunk_table += '''
+                <tr>
+                    <td>+%02X</td>
+                    <td>%s</td>
+                    <td>%s</td>
+                </tr>
+            ''' % (offset, name, str(value))
+
+            offset += sizeof(ctype)
+
+        chunk_table += '</table>'
+        return chunk_table
+
+    def html_template(self, name, address):
+        template = '''
+
+        <style>
+            td {
+                padding-right: 30px;
+            }
+            table {
+                font-size: 12px;
+                white-space: nowrap;
+                overflow: hidden;
+            }
+            body {
+                width: 100%%;
+            }
+            #hexdump {
+                font-family:Monaco;
+                font-size:12px;
+            }
+        </style>
+        <p><b>%s</b> (0x%x)<br>
+        ''' % (name, address)
+
+        return template
+
+
+    def show_struct(self, address, struct_name):
+        io_file_struct = parse_io_file_struct(address)
+        if not io_file_struct:
+            return
+
+        io_file_addr, io_file_s = io_file_struct['io_file']
+        io_jump_t_addr, io_jump_t_s = io_file_struct['io_jump_t']
+
+        self.t_io_file.clear()
+        self.t_io_jump_t.clear()
+
+        html_table =  self.html_template(struct_name, io_file_addr)
+        html_table += self.html_chunk_table(io_file_s)
+        self.t_io_file.insertHtml(html_table)
+
+        html_table =  self.html_template("%s->vtable" % struct_name, io_jump_t_addr)
+        html_table += self.html_chunk_table(io_jump_t_s)
+        self.t_io_jump_t.insertHtml(html_table)
+
+        for obj in [self.t_io_file, self.t_io_jump_t]:
+            cursor = obj.textCursor()
+            cursor.setPosition(0)
+            obj.setTextCursor(cursor)
+
+# -----------------------------------------------------------------------
+

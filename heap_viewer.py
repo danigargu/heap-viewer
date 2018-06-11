@@ -10,10 +10,7 @@ import sys
 
 PLUGIN_DIR = idaapi.idadir(os.path.join("plugins", "heap_viewer"))
 sys.path.append(PLUGIN_DIR)
-
 idaapi.require('plugin_gui')
-
-#------------------------------------------------------------------------
 
 from plugin_gui import HeapPluginForm, PLUGNAME
 

@@ -26,6 +26,7 @@ Currently only supports glibc malloc (ptmalloc2).
   * House of force helper
   * Useful libc offsets
   * Calc chunk size (request2size)
+  * IO_FILE structs
 
 ## Install
 

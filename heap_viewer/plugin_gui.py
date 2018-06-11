@@ -18,6 +18,7 @@ require('ptmalloc')
 require('tracer')
 require('bingraph')
 require('misc')
+require('io_file')
 require('ui_widgets')
 
 # -----------------------------------------------------------------------
