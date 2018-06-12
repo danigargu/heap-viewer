@@ -119,11 +119,17 @@ $ LD_PRELOAD=./libc_64.so.6 ./main_arena_offset
 ![Useful libc offsets](https://user-images.githubusercontent.com/1675387/39698577-b1d40b56-51f5-11e8-8ef8-7711bc2efd32.png)
 
 
-## AUTHOR
+## Learning Resources
+
+I'd recommend the following resources alongside this tool for learning heap exploiting.
+
+* [shellphish's how2heap](https://github.com/shellphish/how2heap)
+
+## Author
 
 * Daniel García Gutiérrez - @danigargu
 
-## CONTRIBUITORS :beer:
+## Contribuitors :beer:
 
 Special mention to my colleagues [soez][soez], [wagiro][wagiro] and [DiaLluvioso][DiaLluvioso] for give me some ideas during the development of the plugin. And of course, the [@pwndbg](https://github.com/pwndbg/pwndbg/) project, from which I picked up some things about heap parsing.
 
@@ -133,8 +139,7 @@ Special mention to my colleagues [soez][soez], [wagiro][wagiro] and [DiaLluvioso
 [wagiro]: https://twitter.com/egarme
 [DiaLluvioso]: https://twitter.com/Manuelbp01
 
-
-## BUGS / FEEDBACK / PRs
+## Bugs / Feedback / PRs
 
 Any comment, issue or pull request will be highly appreciated :-)
 
