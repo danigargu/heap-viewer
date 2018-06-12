@@ -1697,29 +1697,28 @@ class IOFileWidget(CustomWidget):
         except:
             warning("ERROR: Invalid address")
 
-    def html_chunk_table(self, chunk):
-        chunk_table = '<table>'
-        offset = 0
-        for name, ctype in chunk._fields_:
-            value = getattr(chunk, name)
+    def html_struct_table(self, struct):        
+        offsets = get_struct_offsets(type(struct))
+        struct_table = '<table>'
+
+        for name, ctype in struct._fields_:
+            value = getattr(struct, name)
 
             if ctype in [c_uint32, c_uint64]:
                 value = "0x%x" % value
             if ctype is c_char:
                 value = "0x%x" % ord(value)
 
-            chunk_table += '''
+            struct_table += '''
                 <tr>
                     <td>+%02X</td>
                     <td>%s</td>
                     <td>%s</td>
                 </tr>
-            ''' % (offset, name, str(value))
+            ''' % (offsets[name], name, str(value))
 
-            offset += sizeof(ctype)
-
-        chunk_table += '</table>'
-        return chunk_table
+        struct_table += '</table>'
+        return struct_table
 
     def html_template(self, name, address):
         template = '''
@@ -1759,11 +1758,11 @@ class IOFileWidget(CustomWidget):
         self.t_io_jump_t.clear()
 
         html_table =  self.html_template(struct_name, io_file_addr)
-        html_table += self.html_chunk_table(io_file_s)
+        html_table += self.html_struct_table(io_file_s)
         self.t_io_file.insertHtml(html_table)
 
         html_table =  self.html_template("%s->vtable" % struct_name, io_jump_t_addr)
-        html_table += self.html_chunk_table(io_jump_t_s)
+        html_table += self.html_struct_table(io_jump_t_s)
         self.t_io_jump_t.insertHtml(html_table)
 
         for obj in [self.t_io_file, self.t_io_jump_t]:
