@@ -15,6 +15,19 @@ idaapi.require('plugin_gui')
 from plugin_gui import HeapPluginForm, PLUGNAME
 
 # -----------------------------------------------------------------------
+class StartHandler(action_handler_t):
+    def __init__(self):
+        action_handler_t.__init__(self)
+        
+    def activate(self, ctx):
+        p = HeapViewPlugin()
+        p.run()
+        return 1
+
+    def update(self, ctx):
+        return AST_ENABLE_ALWAYS
+
+# -----------------------------------------------------------------------
 class HeapViewPlugin(idaapi.plugin_t):
     flags = 0
     comment = ""
@@ -24,6 +37,7 @@ class HeapViewPlugin(idaapi.plugin_t):
 
     def init(self):
         self.icon_id = 0
+        self.add_menus()
         return idaapi.PLUGIN_KEEP
 
     def run(self, arg=0):
@@ -39,6 +53,23 @@ class HeapViewPlugin(idaapi.plugin_t):
 
         except Exception as e:
             idaapi.warning("[%s] %s" % (PLUGNAME, e.message))
+
+    def add_menus(self):
+        act_name = '%s:start' % PLUGNAME
+        act_desc = action_desc_t(
+            act_name,       # The action name. Must be unique
+            PLUGNAME,       # Action Text
+            StartHandler(), # Action handler
+            None,           # Optional shortcut
+            'Start plugin', # Action tooltip
+            122             # Icon
+        )
+        register_action(act_desc)
+        attach_action_to_menu(
+            'Debugger/Debugger windows/',
+            act_name,
+            SETMENU_APP
+        )
 
     def term(self):
         idaapi.msg("[%s] terminated" % (PLUGNAME))
