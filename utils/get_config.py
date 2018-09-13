@@ -16,8 +16,9 @@ from subprocess import check_output as run
 
 def get_symbols(filename):
     symbols = dict()
+
     if not os.path.exists(filename):
-        return address
+        return symbols
 
     output = run('nm %s 2>&1' % (filename), shell=True).split("\n")
     for line in map(lambda x: x.split(" "), output):
@@ -61,6 +62,9 @@ def gnu_get_libc_version():
 
 
 def find_libc(folder):
+    if not os.path.isdir(folder):
+        return None
+
     for filename in os.listdir(folder):
         if re.match("libc-.+\.so", filename):
             return os.path.normpath(folder + "/" + filename)
@@ -79,8 +83,12 @@ def get_libc_dbg_files():
         return None
 
     for arch, folder in archs_folder.iteritems():
-        arch_path  = os.path.normpath(debug_lib_path + "/" + folder)
-        libc_files[arch] = find_libc(arch_path)
+        arch_path = os.path.normpath(debug_lib_path + "/" + folder)
+        libc_file = find_libc(arch_path)
+
+        if libc_file and os.path.isfile(libc_file):
+            libc_files[arch] = libc_file
+
     return libc_files
 
 
