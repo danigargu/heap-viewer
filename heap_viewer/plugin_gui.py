@@ -4,6 +4,8 @@
 # HeapViewer - by @danigargu
 #
 
+import traceback
+
 from idc import *
 from idautils import *
 from idaapi import *
@@ -118,22 +120,27 @@ class HeapPluginForm(PluginForm):
         self.reload_gui_info()
 
     def reload_gui_info(self, from_arena_cb=False):
-        if not self.heap:
+        if self.heap is None:
             return
 
-        if not self.heap.get_heap_base():
-            self.show_warning('Heap not initialized')
-            return
+        try:
+            if not self.heap.get_heap_base():
+                self.show_warning('Heap not initialized')
+                return
 
-        self.hide_warning()
-        self.arenas_widget.setVisible(True)
+            self.hide_warning()
+            self.arenas_widget.setVisible(True)
 
-        if not from_arena_cb:
-            self.populate_arenas()
+            if not from_arena_cb:
+                self.populate_arenas()
 
-        self.arena_widget.populate_table()
-        self.tcache_widget.populate_table()
-        self.bins_widget.populate_tables()
+            self.arena_widget.populate_table()
+            self.tcache_widget.populate_table()
+            self.bins_widget.populate_tables()
+
+        except Exception as e:
+            self.show_warning(e.message)
+            warning(traceback.format_exc())
 
     def init_heap(self):
         try:            
@@ -162,7 +169,8 @@ class HeapPluginForm(PluginForm):
                 self.show_warning('Config: glibc version mismatched: %s != %s' % \
                     (str(self.config.libc_version), str(current_libc_version)))
 
-        except AttributeError:
+        except AttributeError as e:
+            warning(str(e))
             self.show_warning('Invalid config file content')
          
 

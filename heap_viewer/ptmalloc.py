@@ -280,7 +280,8 @@ class Heap(object):
         self.initialize()
 
     def initialize(self):
-        self.ptr_size = get_arch_ptrsize() 
+        self.ptr_size = get_arch_ptrsize()
+        self.libc_base = get_libc_base()
         self.libc_offsets = self.config.offsets
 
         # TODO: refactor this
@@ -335,12 +336,12 @@ class Heap(object):
 
     @property
     def main_arena_addr(self):
-        libc_base = get_libc_base()
-        return libc_base + self.libc_offsets['main_arena']
+        addr = self.libc_base + self.libc_offsets['main_arena']
+        return addr
 
     @property
     def global_max_fast_addr(self):
-        libc_base = get_libc_base()
+        libc_base = self.libc_base
         offset = self.libc_offsets.get('global_max_fast')
         if offset:
             return libc_base + self.offset
@@ -415,8 +416,8 @@ class Heap(object):
         return self.generic_chain(address, 0, 0, add_stop) # offset 0: next
 
     def get_struct(self, address, struct_type):
+        assert is_loaded(address) == True, "Invalid ptr detected"
         sbytes = get_bytes(address, sizeof(struct_type))
-        assert len(sbytes) == sizeof(struct_type)
         return struct_type.from_buffer_copy(sbytes)
 
     def get_heap_base(self, address=None):
@@ -560,6 +561,10 @@ class Heap(object):
                 status = 'Corrupt'
                 stop_parse = True
 
+            elif chunk_addr == arena.top:
+                status = 'arena->top'
+                stop_parse = True
+
             else:
                 status = self.get_chunk(chunk_addr + real_size).prev_inuse
                 in_freelist = None
@@ -573,14 +578,9 @@ class Heap(object):
 
                 status = 'Used' if not in_freelist else 'Freed (%s)' % in_freelist
 
-
             if count == 0 and self.tcache_enabled:
                 if real_size == tcache_size:
                     status = 'tcache_perthread'
-
-            if chunk_addr == arena.top:
-                status = 'arena->top'
-                stop_parse = True
 
             results.append({
                 'address': chunk_addr, 
