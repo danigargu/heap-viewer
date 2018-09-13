@@ -155,6 +155,13 @@ def get_main_arena_address_x64():
 
 # --------------------------------------------------------------------------
 def get_libc_base():
+    for m in Modules():
+        if re.findall("libc-.*\.so", m.name):
+            return m.base
+    return None
+
+# --------------------------------------------------------------------------
+def get_libc_base_old():
     libc_filter = lambda x: re.findall("libc_.*\.so", SegName(x))
     for addr in filter(libc_filter, Segments()):
         seg = getseg(addr)
