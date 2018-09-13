@@ -1,8 +1,8 @@
 # HeapViewer
 
-An IDA Pro plugin (for now) to examine the heap, focused on exploit development.
+An IDA Pro plugin to examine the heap, focused on exploit development.
 
-Currently only supports glibc malloc (ptmalloc2).
+Currently supports the glibc malloc implementation (ptmalloc2).
 
 ## Requirements
 
