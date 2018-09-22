@@ -520,6 +520,7 @@ class ArenaWidget(CustomWidget):
 
         self.tbl_parsed_heap.resizeRowsToContents()
         self.tbl_parsed_heap.setSortingEnabled(True)
+        self.tbl_parsed_heap.sortByColumn(0, QtCore.Qt.DescendingOrder)
 
 
 # -----------------------------------------------------------------------
