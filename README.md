@@ -4,7 +4,7 @@ An IDA Pro plugin to examine the heap, focused on exploit development.
 
 Currently supports the glibc malloc implementation (ptmalloc2).
 
-[3rd place winner of the 2018 Hex-Rays IDA Pro Plugin Contest](https://www.hex-rays.com/contests/2018/index.shtml)
+[3rd place winner of the 2018 Hex-Rays Plugin Contest](https://www.hex-rays.com/contests/2018/index.shtml)
 
 
 ## Requirements
