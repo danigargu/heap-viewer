@@ -286,7 +286,7 @@ class ChunkWidget(CustomWidget):
         self.setLayout(hbox_actions)
 
 
-    def html_chunk_table(self, chunk):
+    def html_chunk_table(self, chunk, in_use):
         chunk_table = '<table>'
         offset = 0
         for name, ctype in chunk._fields_:
@@ -312,6 +312,16 @@ class ChunkWidget(CustomWidget):
                     <td>%d</td>
                 </tr>
             ''' % (field, getattr(chunk, field))
+
+
+        if in_use is not None:
+            chunk_table += '''
+                <tr>
+                    <td></td>
+                    <td>next->prev_inuse</td>
+                    <td>%d</td>
+                </tr>
+            ''' % (in_use)
 
         chunk_table += '</table>'
         return chunk_table
@@ -372,15 +382,21 @@ class ChunkWidget(CustomWidget):
             return
 
         try:
+            in_use = None
             chunk = self.heap.get_chunk(chunk_addr)
-            chunk_table = self.html_chunk_table(chunk)
+
+            if is_loaded(chunk_addr + chunk.norm_size):
+                in_use = self.heap.next_chunk(chunk_addr).prev_inuse
+
+            chunk_table = self.html_chunk_table(chunk, in_use)
             chunk_hexdump = self.html_chunk_hexdump(chunk)
-        
+
             self.te_chunk_info.clear()
             chunk_info = chunk_template % (chunk_addr, chunk_table, chunk_hexdump)
             self.te_chunk_info.insertHtml(chunk_info)
         except:
             warning("Invalid chunk address")
+            #warning(traceback.format_exc())
 
     def show_chunk(self, expr):
         if type(expr) == str:

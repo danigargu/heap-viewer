@@ -511,7 +511,7 @@ class Heap(object):
 
     def next_chunk(self, address):
         chunk = self.get_chunk(address)
-        return self.get_chunk(address + chunk.size)
+        return self.get_chunk(address + chunk.norm_size)
 
     def arenas(self):
         results = []
