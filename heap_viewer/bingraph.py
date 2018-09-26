@@ -10,8 +10,9 @@ from misc import *
 
 # --------------------------------------------------------------------------
 class BinGraph(idaapi.GraphViewer):
-    def __init__(self, heap, info, close_open=True):   
-        self.heap       = heap
+    def __init__(self, parent, info, close_open=True):   
+        self.cur_arena  = parent.cur_arena
+        self.heap       = parent.heap
         self.info       = info
         self.bin_type   = info['type']
         self.SetCurrentRendererType(idaapi.TCCRT_GRAPH)
@@ -85,7 +86,7 @@ class BinGraph(idaapi.GraphViewer):
         fastbin_id = self.info['fastbin_id']
         size = self.info['size']
 
-        fastbin = self.heap.get_fastbin_by_id(fastbin_id)
+        fastbin = self.heap.get_fastbin_by_id(fastbin_id, self.cur_arena)
 
         if fastbin == 0:
             warning("Empty fastbin entry")
@@ -115,7 +116,7 @@ class BinGraph(idaapi.GraphViewer):
         entry_id   = self.info['bin_id']
         entry_size = self.info['size']
 
-        tcache_entry = self.heap.get_tcache_entry_by_id(entry_id)
+        tcache_entry = self.heap.get_tcache_entry_by_id(entry_id, self.cur_arena)
 
         if not tcache_entry:
             warning("Unable to get tcache entry")

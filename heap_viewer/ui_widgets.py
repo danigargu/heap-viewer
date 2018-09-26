@@ -371,13 +371,16 @@ class ChunkWidget(CustomWidget):
             warning("Invalid expression")
             return
 
-        chunk = self.heap.get_chunk(chunk_addr)
-        chunk_table = self.html_chunk_table(chunk)
-        chunk_hexdump = self.html_chunk_hexdump(chunk)
+        try:
+            chunk = self.heap.get_chunk(chunk_addr)
+            chunk_table = self.html_chunk_table(chunk)
+            chunk_hexdump = self.html_chunk_hexdump(chunk)
         
-        self.te_chunk_info.clear()
-        chunk_info = chunk_template % (chunk_addr, chunk_table, chunk_hexdump)
-        self.te_chunk_info.insertHtml(chunk_info)
+            self.te_chunk_info.clear()
+            chunk_info = chunk_template % (chunk_addr, chunk_table, chunk_hexdump)
+            self.te_chunk_info.insertHtml(chunk_info)
+        except:
+            warning("Invalid chunk address")
 
     def show_chunk(self, expr):
         if type(expr) == str:
@@ -661,7 +664,7 @@ class BinsWidget(CustomWidget):
                 idx   = int(sender.item(sender.currentRow(), 0).text())
                 size  = int(sender.item(sender.currentRow(), 1).text(), 16)
 
-                graph = BinGraph(self.heap, info={
+                graph = BinGraph(self, info={
                     'type': 'fastbin',
                     'fastbin_id': idx,
                     'size': size
@@ -672,20 +675,19 @@ class BinsWidget(CustomWidget):
                 idx  = sender.item(sender.currentRow(), 0).text()
                 base = int(sender.item(sender.currentRow(), 3).text(), 16)
 
-                graph = BinGraph(self.heap, info={
+                graph = BinGraph(self, info={
                     'type': 'unsortedbin',
                     'bin_id': idx,
                     'bin_base': base    
                 })
                 graph.Show()
 
-
             elif sender is self.tbl_smallbins:
                 idx  = sender.item(sender.currentRow(), 0).text()
                 size = int(sender.item(sender.currentRow(), 1).text(), 16)
                 base = int(sender.item(sender.currentRow(), 4).text(), 16)
 
-                graph = BinGraph(self.heap, info={
+                graph = BinGraph(self, info={
                     'type': 'smallbin',
                     'bin_id': idx,
                     'size': size,
@@ -698,27 +700,13 @@ class BinsWidget(CustomWidget):
                 size = int(sender.item(sender.currentRow(), 1).text(), 16)
                 base = int(sender.item(sender.currentRow(), 4).text(), 16)
 
-                graph = BinGraph(self.heap, info={
+                graph = BinGraph(self, info={
                     'type': 'largebin',
                     'bin_id': idx,
                     'size': size,
                     'bin_base': base    
                 })
                 graph.Show()
-
-
-            elif sender is self.tbl_tcache:
-                idx = int(sender.item(sender.currentRow(), 0).text())
-                size = int(sender.item(sender.currentRow(), 1).text(), 16)
-                fd = int(sender.item(sender.currentRow(), 3).text(), 16)
-
-                graph = BinGraph(self.heap, info={
-                    'type': 'tcache',
-                    'bin_id': idx,
-                    'size': size,
-                })
-                graph.Show()
-
 
 
     def show_bin_chain(self):
@@ -975,7 +963,7 @@ class TcacheWidget(CustomWidget):
             size = int(sender.item(sender.currentRow(), 1).text(), 16)
             fd = int(sender.item(sender.currentRow(), 3).text(), 16)
 
-            graph = BinGraph(self.heap, info={
+            graph = BinGraph(self, info={
                 'type': 'tcache',
                 'bin_id': idx,
                 'size': size,
