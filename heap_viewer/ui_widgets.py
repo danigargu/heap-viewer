@@ -999,7 +999,8 @@ class TcacheWidget(CustomWidget):
 
         idx = 0
         for i, (size, entry) in enumerate(tcache.iteritems()):
-            if entry['counts'] == 0:
+
+            if entry['counts'] == 0 and entry['next'] == 0:
                 continue
 
             self.tbl_tcache.insertRow(idx)

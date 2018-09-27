@@ -130,12 +130,17 @@ class BinGraph(idaapi.GraphViewer):
 
         for i, mem_addr in enumerate(chain):
             chunk_addr = self.heap.mem2chunk(mem_addr)
-            chunk_info = self.heap.get_chunk(chunk_addr)
 
-            prev_chunk = id_chunk
-            tcache_info = self.tcache_info(mem_addr, chunk_addr)
-            id_chunk = self.AddNode( (True, str(chunk_info), tcache_info, chunk_addr) )
-            self.AddEdge(prev_chunk, id_chunk)
+            try:
+                chunk_info = self.heap.get_chunk(chunk_addr)
+                prev_chunk = id_chunk
+
+                tcache_info = self.tcache_info(mem_addr, chunk_addr)
+                id_chunk = self.AddNode( (True, str(chunk_info), tcache_info, chunk_addr) )
+                self.AddEdge(prev_chunk, id_chunk)
+
+            except:
+                c_error = True
 
         if c_error: 
             self.add_error_edge(id_chunk)           
