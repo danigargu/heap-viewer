@@ -242,8 +242,7 @@ class TracerWidget(CustomWidget):
         
         self.tbl_traced_chunks.resizeRowsToContents()
         self.tbl_traced_chunks.setSortingEnabled(True)
-        #self.parent.reload_gui_info()
-
+        self.parent.reload_gui_info()
 
 # -----------------------------------------------------------------------
 class ChunkWidget(CustomWidget):
