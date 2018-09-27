@@ -111,9 +111,9 @@ class TracerWidget(CustomWidget):
         self._create_menu()     
 
     def _create_table(self):
-        self.tbl_traced_chunks = TTable(['#','User-address', 'Action', 'Arg 1', 'Arg 2', 'Caller', 'Caller address'])
+        self.tbl_traced_chunks = TTable(['#','User-address', 'Action', 'Arg 1', 'Arg 2', 'Thread', 'Caller', 'Caller address'])
         self.tbl_traced_chunks.setRowCount(0)
-        self.tbl_traced_chunks.resize_columns([40, 155, 80, 80, 80, 200, 200])
+        self.tbl_traced_chunks.resize_columns([40, 155, 80, 80, 80, 80, 200, 200])
         self.tbl_traced_chunks.customContextMenuRequested.connect(self.context_menu)
         self.tbl_traced_chunks.itemSelectionChanged.connect(self.show_selected_chunk)
 
@@ -167,7 +167,7 @@ class TracerWidget(CustomWidget):
             idc.Jump(chunk_addr)
 
         elif action == goto_caller:
-            caller_addr = sender.item(sender.currentRow(), 6).text()
+            caller_addr = sender.item(sender.currentRow(), 7).text()
             if caller_addr:
                 idc.Jump(int(caller_addr, 16))
 
@@ -212,7 +212,7 @@ class TracerWidget(CustomWidget):
         norm_address = "0x%x-0x%x" % (chunk_addr, self.heap.ptr_size * 2)
         self.parent.show_chunk_info(norm_address)
 
-    def append_traced_chunk(self, addr, action, arg1, arg2, caller):
+    def append_traced_chunk(self, addr, action, arg1, arg2, thread_id, caller):
         num_rows = self.tbl_traced_chunks.rowCount()
 
         self.tbl_traced_chunks.setSortingEnabled(False)
@@ -227,6 +227,7 @@ class TracerWidget(CustomWidget):
         it_action = QTableWidgetItem("%s" % action)
         it_arg1 = QTableWidgetItem(arg1)
         it_arg2 = QTableWidgetItem(arg2)
+        it_thread = QTableWidgetItem("%d" % thread_id)
         it_caller = QTableWidgetItem("%s" % caller_name_offset)
         it_caller_a = QTableWidgetItem("0x%x" % caller)
         
@@ -235,12 +236,13 @@ class TracerWidget(CustomWidget):
         self.tbl_traced_chunks.setItem(num_rows, 2, it_action)
         self.tbl_traced_chunks.setItem(num_rows, 3, it_arg1)
         self.tbl_traced_chunks.setItem(num_rows, 4, it_arg2)
-        self.tbl_traced_chunks.setItem(num_rows, 5, it_caller)
-        self.tbl_traced_chunks.setItem(num_rows, 6, it_caller_a)
+        self.tbl_traced_chunks.setItem(num_rows, 5, it_thread)
+        self.tbl_traced_chunks.setItem(num_rows, 6, it_caller)
+        self.tbl_traced_chunks.setItem(num_rows, 7, it_caller_a)
         
         self.tbl_traced_chunks.resizeRowsToContents()
         self.tbl_traced_chunks.setSortingEnabled(True)
-        self.parent.reload_gui_info()
+        #self.parent.reload_gui_info()
 
 
 # -----------------------------------------------------------------------
@@ -1208,12 +1210,14 @@ class HouseOfForceWidget(CustomWidget):
         arena = self.heap.get_arena(self.cur_arena)
         target_addr = int(self.t_house_force_addr.text(), 16)
 
-        top_size_ptr = arena.top + self.ptr_size
+        ptr_size = self.heap.ptr_size
+
+        top_size_ptr = arena.top + ptr_size
         top_size_val = self.heap.get_ptr(top_size_ptr)
-        evil_size = target_addr - (self.ptr_size * 2) - top_size_ptr
+        evil_size = target_addr - (ptr_size * 2) - top_size_ptr
 
         # unsigned
-        if self.ptr_size == 4:
+        if ptr_size == 4:
             evil_size_u = evil_size & 0xffffffff
         else:
             evil_size_u = evil_size & 0xffffffffffffffff

@@ -522,6 +522,10 @@ class Heap(object):
         next_ptr = arena.next
 
         while next_ptr not in (main_arena_addr, 0):
+
+            if not is_loaded(next_ptr):
+                break
+
             arena = self.get_arena(next_ptr)
             results.append([next_ptr, arena])
             next_ptr = arena.next 

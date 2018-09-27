@@ -124,6 +124,8 @@ class HeapPluginForm(PluginForm):
             return
 
         try:
+            RefreshDebuggerMemory()
+            
             if not self.heap.get_heap_base():
                 self.show_warning('Heap not initialized')
                 return
