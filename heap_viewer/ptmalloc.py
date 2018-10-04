@@ -387,7 +387,7 @@ class Heap(object):
         b_error = False
 
         if not isLoaded(address):
-            return result
+            return (result, True)
 
         next_addr = self.get_ptr(address + offset)
         while next_addr != stop and count < limit:
