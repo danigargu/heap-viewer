@@ -35,7 +35,7 @@ Currently supports the glibc malloc implementation (ptmalloc2).
 
 Just drop the `heap_viewer.py` file and the `heap_viewer` folder into IDA's plugin directory.
 
-Because IDA not load libc-dbg symbols in the debug session, is necesary generate a config file before using the plugin. To make this, simply install the `libc6-dbg` package in the remote linux machine and execute the script `utils\get_config.py`. Then, paste the content in the `heap_viewer\config.json` file.
+Because IDA not load libc-dbg symbols in the debug session, is necesary generate a config file before using the plugin. To make this, simply install the `libc6-dbg` package in the remote linux machine and execute the script `utils\get_config.py`. Then, paste the content in the `heap_viewer\files\config.json` file.
 
 
 ### get_config.py
