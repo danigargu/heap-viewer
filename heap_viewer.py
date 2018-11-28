@@ -17,7 +17,7 @@ from plugin_gui import HeapPluginForm, PLUGNAME
 # -----------------------------------------------------------------------
 class StartHandler(idaapi.action_handler_t):
     def __init__(self):
-        super(StartHandler, self).__init__()
+        idaapi.action_handler_t.__init__(self)
         
     def activate(self, ctx):
         p = HeapViewPlugin()
