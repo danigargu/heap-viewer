@@ -8,11 +8,7 @@ import idaapi
 import os
 import sys
 
-PLUGIN_DIR = idaapi.idadir(os.path.join("plugins", "heap_viewer"))
-sys.path.append(PLUGIN_DIR)
-idaapi.require('plugin_gui')
-
-from plugin_gui import HeapPluginForm, PLUGNAME
+from heap_viewer.plugin_gui import HeapPluginForm, PLUGNAME
 
 # -----------------------------------------------------------------------
 class StartHandler(idaapi.action_handler_t):
