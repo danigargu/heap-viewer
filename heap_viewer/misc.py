@@ -19,7 +19,6 @@ from collections import OrderedDict
 PLUGVER  = "0.1"
 PLUGNAME = "HeapViewer"
 
-#PLUGIN_DIR  = idadir(os.path.join("plugins", "heap_viewer"))
 PLUGIN_DIR  = os.path.dirname(os.path.abspath(__file__))
 FILES_DIR   = os.path.join(PLUGIN_DIR, "files")
 ICONS_DIR   = os.path.join(FILES_DIR, "icons")

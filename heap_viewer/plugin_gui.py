@@ -118,7 +118,11 @@ class HeapPluginForm(PluginForm):
             RefreshDebuggerMemory()
             
             if not self.heap.get_heap_base():
-                self.show_warning('Heap not initialized')
+                self.show_warning("Heap not initialized")
+                return
+
+            if not get_libc_base():
+                self.show_warning("Unable to resolve glibc base address.")
                 return
 
             self.hide_warning()

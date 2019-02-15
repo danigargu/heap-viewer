@@ -1384,8 +1384,14 @@ class LibcOffsetsWidget(CustomWidget):
 
         }
         
-        self.libc_base = get_libc_base()
+        libc_base = get_libc_base()
+        if not libc_base:
+            return result
+
         libc_names = get_libc_names()
+        if not libc_names:
+            warning("Unable to get glibc symbols.")
+            return result
 
         for s_type, symbols in libc_symbols.iteritems():
             for sym in symbols:
