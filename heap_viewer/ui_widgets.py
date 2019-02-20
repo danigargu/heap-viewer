@@ -1384,8 +1384,8 @@ class LibcOffsetsWidget(CustomWidget):
 
         }
         
-        libc_base = get_libc_base()
-        if not libc_base:
+        self.libc_base = get_libc_base()
+        if not self.libc_base:
             return result
 
         libc_names = get_libc_names()

@@ -84,13 +84,48 @@ def offset_of(struct_type, member):
     return result
 
 # --------------------------------------------------------------------------
-def get_libc_version():
+def get_libc_version_appcall():
     ''' resolve current libc version via appcall '''
     try:
         gnu_get_libc_version = Appcall.proto("gnu_get_libc_version", "char *gnu_get_libc_version();")
         return gnu_get_libc_version()
     except:
         return None
+
+# --------------------------------------------------------------------------
+def get_libc_version_64():
+    gnu_get_libc_version = LocByName("gnu_get_libc_version")
+    if gnu_get_libc_version != BADADDR:
+        version = GetString(GetOperandValue(gnu_get_libc_version, 1))
+        if len(version) > 0:
+            return version
+    return None
+
+# --------------------------------------------------------------------------
+def get_libc_version_disasm():
+    fnc_addr = LocByName("gnu_get_libc_version")
+    if fnc_addr == BADADDR:
+        return None
+
+    MakeFunction(fnc_addr)
+    fnc = get_func(fnc_addr)
+    if fnc is None:
+        return None
+
+    for head in Heads(fnc.start_ea, fnc.end_ea):
+        disas = GetDisasm(head)
+        if disas.startswith("lea"):
+            m = re.search(";\s\"(.*)\"$", disas)
+            if m:
+                return m.groups()[0]
+    return None
+
+# --------------------------------------------------------------------------
+def get_libc_version():
+    libc_version = get_libc_version_disasm()
+    if libc_version is None:
+        libc_version = get_libc_version_appcall()
+    return libc_version
 
 # --------------------------------------------------------------------------
 def apply_struct(ea, struct_name):
@@ -156,7 +191,7 @@ def get_main_arena_address_x64():
 # --------------------------------------------------------------------------
 def get_libc_base():
     for m in Modules():
-        if re.findall("libc-.*\.so", m.name):
+        if libc_filename_filter(m.name):
             return m.base
     return None
 
@@ -170,10 +205,14 @@ def get_libc_base_old():
     return None
 
 # --------------------------------------------------------------------------
+def libc_filename_filter(name):
+    return (re.findall("libc-.*\.so", name) or name.endswith("libc.so.6"))
+
+# --------------------------------------------------------------------------
 def get_libc_module():
     mod_iter = Modules()
     for m in mod_iter:
-        if re.search(r"libc-.*\.so$", m.name):
+        if libc_filename_filter(m.name):
             next_m = next(mod_iter)
             return (m.base, next_m.base) # start/end
     return None

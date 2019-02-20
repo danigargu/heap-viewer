@@ -116,7 +116,6 @@ class HeapPluginForm(PluginForm):
 
         try:
             RefreshDebuggerMemory()
-            
             if not self.heap.get_heap_base():
                 self.show_warning("Heap not initialized")
                 return
@@ -137,7 +136,7 @@ class HeapPluginForm(PluginForm):
 
         except Exception as e:
             self.show_warning(e.message)
-            warning(traceback.format_exc())
+            #warning(traceback.format_exc())
 
     def init_heap(self):
         try:            
