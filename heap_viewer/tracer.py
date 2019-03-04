@@ -8,7 +8,8 @@ from idc import *
 from idaapi import *
 from idautils import *
 from ctypes import *
-from misc import *
+
+from heap_viewer.misc import *
 
 # -----------------------------------------------------------------------
 class HeapTracer(DBG_Hooks):

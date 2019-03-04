@@ -6,8 +6,11 @@
 # IO_FILE structs
 #
 
+import idaapi
+import collections
+
 from ctypes import *
-from misc import *
+from heap_viewer.misc import *
 
 #-----------------------------------------------------------------------
 # struct _IO_FILE 32 bits
@@ -31,7 +34,7 @@ class IO_file_32(LittleEndianStructure):
         ("_chain", c_uint32),
         ("_fileno", c_int32),
         ("_flags2", c_int32),
-        ("_old_offset", c_int32), ## revisar
+        ("_old_offset", c_int32),
         ("_cur_column", c_ushort),
         ("_vtable_offset", c_char),
         ("_shortbuf", c_char * 1),
@@ -148,9 +151,9 @@ class IO_jump_t_64(LittleEndianStructure):
 
 class IO_file_plus_32(LittleEndianStructure):
     _pack_ = 4
-    _fields_ =  [
+    _fields_ = [
         ("file", IO_file_32),
-        ("vtable", c_uint32)
+        ("vtable", IO_jump_t_32)
     ]
 
 #-----------------------------------------------------------------------
@@ -158,36 +161,38 @@ class IO_file_plus_32(LittleEndianStructure):
 
 class IO_file_plus_64(LittleEndianStructure):
     _pack_ = 8
-    _fields_ =  [
+    _fields_ = [
         ("file", IO_file_64),
-        ("vtable", c_uint64)
+        ("vtable", IO_jump_t_64)
     ]
 
 #-----------------------------------------------------------------------
-def parse_io_file_struct(address):
+IO_structs = collections.namedtuple('IO_Structs', 'file vtable file_plus')
+
+io_file_structs = {
+    4: IO_structs(IO_file_32, IO_jump_t_32, IO_file_plus_32),
+    8: IO_structs(IO_file_64, IO_jump_t_64, IO_file_plus_64)
+}
+
+#-----------------------------------------------------------------------
+def parse_io_file_structs(address):
     io_file_s = None
     io_jump_s = None
+    io_file_plus_s = None
 
-    ptr_size = get_arch_ptrsize()    
-    if ptr_size == 4:
-        io_file_s = IO_file_32
-        io_jump_s = IO_jump_t_32
-    else:
-        io_file_s = IO_file_64
-        io_jump_s = IO_jump_t_64
+    ptr_size = get_arch_ptrsize()
+    structs = io_file_structs.get(ptr_size)
+    if structs is None:
+        return None
 
-    buff_file = get_bytes(address, sizeof(io_file_s))
-    assert len(buff_file) == sizeof(io_file_s)
-    io_file_data = io_file_s.from_buffer_copy(buff_file)
+    io_file_data = parse_struct(address, structs.file)
+    io_jump_data = parse_struct(io_file_data.vtable, structs.vtable)
 
-    buff_io_jump = get_bytes(io_file_data.vtable, sizeof(io_jump_s))
-    assert len(buff_io_jump) == sizeof(io_jump_s)
-    io_jump_data = io_jump_s.from_buffer_copy(buff_io_jump)
+    io_plus = structs.file_plus()
+    io_plus.file = io_file_data
+    io_plus.vtable = io_jump_data
 
-    return {
-        'io_file': (address, io_file_data),
-        'io_jump_t': (io_file_data.vtable, io_jump_data)
-    }
+    return io_plus
 
 #-----------------------------------------------------------------------
 

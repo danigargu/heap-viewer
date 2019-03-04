@@ -14,14 +14,10 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtWidgets import QWidget, QSplitter, QTabWidget, QPushButton, QComboBox
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel
 
-# -----------------------------------------------------------------------
-
-from ptmalloc import Heap
-from tracer import HeapTracer
-from bingraph import BinGraph
-
-from misc import *
-from ui_widgets import *
+from heap_viewer.misc import *
+from heap_viewer.ui_widgets import *
+from heap_viewer.ptmalloc import Heap
+from heap_viewer import CONFIG_PATH, ICONS_DIR, PLUGNAME
 
 # -----------------------------------------------------------------------
 class HeapPluginForm(PluginForm):
@@ -114,6 +110,18 @@ class HeapPluginForm(PluginForm):
         if self.heap is None:
             return
 
+        if not is_process_suspended():
+            answer = askyn_c(
+                ASKBTN_YES, 
+                "HIDECANCEL\nThe process must be suspended to reload the info.\n\
+                Do you want to suspend it?")
+
+            if answer == ASKBTN_NO:
+                return
+
+            if not suspend_process():
+                warning("Unable to suspend the process")
+                return
         try:
             RefreshDebuggerMemory()
             if not self.heap.get_heap_base():
@@ -136,7 +144,7 @@ class HeapPluginForm(PluginForm):
 
         except Exception as e:
             self.show_warning(e.message)
-            #warning(traceback.format_exc())
+            warning(traceback.format_exc())
 
     def init_heap(self):
         try:            
@@ -172,17 +180,20 @@ class HeapPluginForm(PluginForm):
 
     def populate_arenas(self):
         old_arena = self.cur_arena
+        self.cb_arenas.blockSignals(True)
         self.cb_arenas.clear()
 
         for addr, arena in self.heap.arenas():
             if addr == self.heap.main_arena_addr:
                 self.cb_arenas.addItem("main_arena", None)
+                self.cb_arenas.addItem("main_arena2", 1)
             else:
                 self.cb_arenas.addItem("0x%x" % addr, addr)
 
         idx = self.cb_arenas.findData(old_arena)
         if idx != -1:
             self.cb_arenas.setCurrentIndex(idx)
+        self.cb_arenas.blockSignals(False)
 
     def show_warning(self, txt):
         self.txt_warning.setText(txt)

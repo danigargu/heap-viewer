@@ -9,8 +9,9 @@ from idautils import *
 from idaapi import *
 
 from ctypes import *
-from misc import *
 from collections import OrderedDict
+
+from heap_viewer.misc import *
 
 #-----------------------------------------------------------------------
 # Some glibc heap constants

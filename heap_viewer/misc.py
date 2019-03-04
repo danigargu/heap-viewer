@@ -14,15 +14,7 @@ from idautils import *
 from ctypes import *
 
 from collections import OrderedDict
-
-# --------------------------------------------------------------------------
-PLUGVER  = "0.1"
-PLUGNAME = "HeapViewer"
-
-PLUGIN_DIR  = os.path.dirname(os.path.abspath(__file__))
-FILES_DIR   = os.path.join(PLUGIN_DIR, "files")
-ICONS_DIR   = os.path.join(FILES_DIR, "icons")
-CONFIG_PATH = os.path.join(FILES_DIR, "config.json")
+from heap_viewer import PLUGNAME, ICONS_DIR, CONFIG_PATH
 
 # --------------------------------------------------------------------------
 class HeapConfig(object):
@@ -82,6 +74,12 @@ def offset_of(struct_type, member):
             break
         offset += sizeof(ctype)
     return result
+
+# --------------------------------------------------------------------------
+def parse_struct(address, struct_type):
+    buff = idaapi.get_bytes(address, sizeof(struct_type))
+    assert len(buff) == sizeof(struct_type)
+    return struct_type.from_buffer_copy(buff)
 
 # --------------------------------------------------------------------------
 def get_libc_version_appcall():
@@ -277,4 +275,7 @@ def make_html_chain(name, chain, b_error):
     return res_html
 
 # --------------------------------------------------------------------------
+def is_process_suspended():
+    return (idaapi.get_process_state() == DSTATE_SUSP)
 
+# --------------------------------------------------------------------------

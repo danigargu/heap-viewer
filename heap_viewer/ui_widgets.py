@@ -20,10 +20,10 @@ from PyQt5.QtWidgets import QWidget, QCheckBox, QLabel, QAction, QTextEdit
 from PyQt5.QtWidgets import QSplitter, QListWidget, QVBoxLayout, QHBoxLayout
 from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
 
-from misc import *
-from tracer import HeapTracer
-from bingraph import BinGraph
-from io_file import parse_io_file_struct
+from heap_viewer.misc import *
+from heap_viewer.tracer import HeapTracer
+from heap_viewer.bingraph import BinGraph
+from heap_viewer.io_file import parse_io_file_structs
 
 # -----------------------------------------------------------------------
 class TTable(QTableWidget):
@@ -1579,7 +1579,14 @@ class ConfigWidget(CustomWidget):
             config = json.loads(self.t_config.toPlainText())
             with open(self.parent.config_path, 'wb') as f:
                 f.write(json.dumps(config, indent=4))
-            info("Config updated.\nPlease, restart the plugin to apply the changes.")
+
+            answer = askyn_c(
+                ASKBTN_YES, 
+                "HIDECANCEL\nConfig updated. Do you want to restart the plugin to apply the changes?")
+
+            if answer == ASKBTN_YES:
+                self.parent.Close(1)
+                self.parent.Show()
 
         except Exception as e:
             warning("Error: %s" % traceback.format_exc())
@@ -1762,22 +1769,20 @@ class IOFileWidget(CustomWidget):
 
 
     def show_struct(self, address, struct_name):
-        io_file_struct = parse_io_file_struct(address)
-        if not io_file_struct:
+        io_file_struct = parse_io_file_structs(address)
+        if io_file_struct is None:
             return
-
-        io_file_addr, io_file_s = io_file_struct['io_file']
-        io_jump_t_addr, io_jump_t_s = io_file_struct['io_jump_t']
 
         self.t_io_file.clear()
         self.t_io_jump_t.clear()
 
-        html_table =  self.html_template(struct_name, io_file_addr)
-        html_table += self.html_struct_table(io_file_s)
+        io_jump_t_addr = io_file_struct.file.vtable
+        html_table =  self.html_template(struct_name, address)
+        html_table += self.html_struct_table(io_file_struct.file)
         self.t_io_file.insertHtml(html_table)
 
         html_table =  self.html_template("%s->vtable" % struct_name, io_jump_t_addr)
-        html_table += self.html_struct_table(io_jump_t_s)
+        html_table += self.html_struct_table(io_file_struct.vtable)
         self.t_io_jump_t.insertHtml(html_table)
 
         for obj in [self.t_io_file, self.t_io_jump_t]:

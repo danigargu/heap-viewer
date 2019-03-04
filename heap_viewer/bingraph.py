@@ -6,7 +6,6 @@
 
 import idc
 import idaapi
-from misc import *
 
 # --------------------------------------------------------------------------
 class BinGraph(idaapi.GraphViewer):
