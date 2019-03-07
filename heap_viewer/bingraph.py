@@ -7,8 +7,10 @@
 import idc
 import idaapi
 
+from idaapi import GraphViewer
+
 # --------------------------------------------------------------------------
-class BinGraph(idaapi.GraphViewer):
+class BinGraph(GraphViewer):
     def __init__(self, parent, info, close_open=True):   
         self.cur_arena  = parent.cur_arena
         self.heap       = parent.heap
