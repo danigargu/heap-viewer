@@ -203,7 +203,7 @@ class BinGraph(GraphViewer):
     def OnCommand(self, cmd_id):
         if cmd_id == self.cmd_refresh:
             self.Refresh()
-            refresh_idaview_anyway()
+            idaapi.refresh_idaview_anyway()
 
     def Show(self):
         if not GraphViewer.Show(self):

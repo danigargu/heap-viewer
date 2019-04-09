@@ -10,10 +10,11 @@ from idautils import *
 from ctypes import *
 
 from heap_viewer.misc import *
+import heap_viewer.config as config
 
 # -----------------------------------------------------------------------
 class HeapTracer(DBG_Hooks):
-    def __init__(self, form, resume=True):
+    def __init__(self, callback, resume=True):
         DBG_Hooks.__init__(self)
         self.ptr_size        = None
         self.get_ptr         = None
@@ -21,12 +22,12 @@ class HeapTracer(DBG_Hooks):
         self.regs            = None
         self.callers         = {}
         self.hooked_funcs    = {}
-        self.form            = form
+        self.callback        = callback
         self.resume          = resume
         self.initialize()
 
     def initialize(self):
-        self.ptr_size = get_arch_ptrsize()
+        self.ptr_size = config.ptr_size
 
         if self.ptr_size == 4:
             self.regs = {'IP': 'EIP', 'SP': 'ESP', 'AX': 'EAX'}
@@ -79,6 +80,7 @@ class HeapTracer(DBG_Hooks):
 
         args = None
         ret_addr = self.get_return_address()
+        thread_id = get_current_thread()
 
         if func_name == 'malloc':
             req_size = self.get_arg(0)
@@ -97,6 +99,11 @@ class HeapTracer(DBG_Hooks):
         elif func_name == 'free':
             free_chunk = self.get_arg(0)
             args = free_chunk
+
+            caller = PrevHead(ret_addr)
+
+            self.callback(free_chunk, func_name, None, 
+                None, thread_id, caller, from_ret=False)
 
         self.callers[ret_addr] = {
             'func': func_name,
@@ -122,6 +129,7 @@ class HeapTracer(DBG_Hooks):
         if caller_info is None:
             return 0
 
+        RefreshDebuggerMemory()
         caller = PrevHead(rip)
         func_name = caller_info['func']
         thread_id = get_current_thread()
@@ -129,25 +137,27 @@ class HeapTracer(DBG_Hooks):
         if func_name == 'malloc':
             addr = GetRegValue(self.regs['AX'])
             req_size = caller_info['args']
-            self.form.append_traced_chunk(addr, func_name, 
-                req_size, None, thread_id, caller)
+            self.callback(addr, func_name, req_size, 
+                None, thread_id, caller)
 
         elif func_name == 'calloc':
             addr = GetRegValue(self.regs['AX'])
             req_nmemb, req_size = caller_info['args']
-            self.form.append_traced_chunk(addr, func_name, 
-                req_nmemb, req_size, thread_id, caller)
+            self.callback(addr, func_name, req_nmemb, 
+                req_size, thread_id, caller)
 
         elif func_name == 'realloc':
             addr = GetRegValue(self.regs['AX'])
             tgt_addr, req_size = caller_info['args']
-            self.form.append_traced_chunk(addr, func_name, 
-                tgt_addr, req_size, thread_id, caller)
+            self.callback(addr, func_name, tgt_addr, 
+                req_size, thread_id, caller)
 
         elif func_name == 'free':
             free_chunk = caller_info['args']
-            self.form.append_traced_chunk(free_chunk, func_name, 
-                None, None, thread_id, caller)
+
+            self.callback(free_chunk, func_name, None, 
+                None, thread_id, caller)
+
  
         return 0
 

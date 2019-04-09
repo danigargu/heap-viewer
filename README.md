@@ -13,66 +13,40 @@ Currently supports the glibc malloc implementation (ptmalloc2).
 
 ## Tested on
 
-* glibc <= 2.27 (x86, x64)
+* glibc 2.23 <= 2.28 (x86, x64)
 
 ## Features
 
 * Heap tracer (malloc/free/calloc/realloc)
+  * Detection of overlaps and double-frees
+  * Visualization using [villoc](https://github.com/wapiflapi/villoc)
 * Malloc chunk info
+* Chunk editor
 * Multi-arena info (chunks, top, last-remainder)
 * Bins info (fastbins, unsortedbin, smallbins y largebins)
 * Tcache info (glibc >= 2.26)
 * GraphView for linked lists (bins/tcache)
 * Magic utils:
   * Unlink merge info
+  * Freeable/merge info
   * Fake fastbin finder
   * House of force helper
   * Useful libc offsets
   * Calc chunk size (request2size)
   * IO_FILE structs
 
+
 ## Install
 
 Just drop the `heap_viewer.py` file and the `heap_viewer` folder into IDA's plugin directory.
 
-Because IDA not load libc-dbg symbols in the debug session, is necesary generate a config file before using the plugin. To make this, simply install the `libc6-dbg` package in the remote linux machine and execute the script `utils\get_config.py`. Then, paste the content in the `heap_viewer\files\config.json` file.
+To install just for the current user, copy the files into one of these directories:
 
+| OS          | Plugin path                          |
+| ----------- | ------------------------------------ |
+| Linux/macOS | `~/.idapro/plugins`                  |
+| Windows     | `%AppData%\Hex-Rays\IDA Pro\plugins` |
 
-### get_config.py
-```
-$ python get_config.py
-[*] config.json:
-
-{
-  "libc_offsets": {
-    "32": {
-      "mp_": 1921312,
-      "main_arena": 1922976,
-    },
-    "64": {
-      "mp_": 3883648,
-      "main_arena": 3886144,
-    }
-  },
-  "libc_version": "2.27"
-}
-```
-
-If you not have the dbg symbols for given libc (ex: CTFs ;D), you can use the `get_main_arena` tool, and get the main_arena offset for that libc. This is enough so the plugin works correctly. Simply put the main_arena offset in the config.json file.
-
-Examples:
-
-```
-$ ./main_arena_offset
-[*] libc version:       2.27
-[*] libc file:          /lib/i386-linux-gnu/libc-2.27.so
-[*] libc address:       0xf7ceb000
-[*] main_arena:         0xf7ec07a0
-[*] main_arena offset:  0x1d57a0
-
-$ LD_PRELOAD=./libc_64.so.6 ./main_arena_offset
-...
-```
 
 ## Screenshots
 
@@ -127,6 +101,7 @@ $ LD_PRELOAD=./libc_64.so.6 ./main_arena_offset
 I'd recommend the following resources alongside this tool for learning heap exploiting.
 
 * [shellphish's how2heap](https://github.com/shellphish/how2heap)
+
 
 ## Author
 

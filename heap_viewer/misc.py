@@ -17,29 +17,6 @@ from collections import OrderedDict
 from heap_viewer import PLUGNAME, ICONS_DIR, CONFIG_PATH
 
 # --------------------------------------------------------------------------
-class HeapConfig(object):
-    def __init__(self, config_file):
-        with open(config_file, 'rb') as f:
-            self.__dict__ = json.loads(f.read())
-
-    @property
-    def offsets(self):
-        ptr_size = get_arch_ptrsize()
-        if ptr_size == 4:
-            return self.libc_offsets.get('32')
-        elif ptr_size == 8:
-            return self.libc_offsets.get('64')
-        return None
-
-    def dump_config(self):
-        return json.dumps(self.__dict__, indent=4)
-
-    def write_to_file(self, filename):
-        config = self.dump_config()
-        with open(filename, 'wb') as f:
-            f.write(config)
-
-# --------------------------------------------------------------------------
 def log(msg):
     idaapi.msg("[%s] %s\n" % (PLUGNAME, msg))
 
@@ -204,7 +181,7 @@ def get_libc_base_old():
 
 # --------------------------------------------------------------------------
 def libc_filename_filter(name):
-    return (re.findall("libc-.*\.so", name) or name.endswith("libc.so.6"))
+    return (name.endswith("libc.so.6") or re.findall("libc.*\.so", name))
 
 # --------------------------------------------------------------------------
 def get_libc_module():
@@ -229,7 +206,7 @@ def get_func_name_offset(ea):
     func = idaapi.get_func(ea)
     if func:
         offset = ea - func.startEA
-        return "%s+0x%d" % (GetFunctionName(ea), offset)
+        return "%s+%#x" % (GetFunctionName(ea), offset)
     return None
 
 # --------------------------------------------------------------------------
@@ -279,3 +256,73 @@ def is_process_suspended():
     return (idaapi.get_process_state() == DSTATE_SUSP)
 
 # --------------------------------------------------------------------------
+def find_main_arena():
+    main_arena = LocByName("main_arena") # from libc6-dbg
+    if main_arena != BADADDR:
+        return main_arena
+
+    ptr_size = get_arch_ptrsize()
+    ea = SegStart(LocByName("_IO_2_1_stdin_"))
+    end_ea = SegEnd(ea)
+
+    # &main_arena->next
+    offsets = {
+        4: [1088, 1096], # 32 bits
+        8: [2152, 2160]  # 64 bits
+    }
+
+    if ea == BADADDR or end_ea == BADADDR:
+        return None
+
+    get_ptr = Dword if ptr_size == 4 else Qword
+    while ea < end_ea:
+        ptr = get_ptr(ea) # ptr to main_arena
+        if is_loaded(ptr) and ptr < ea and get_ptr(ptr)==0: # flags=0x0
+            if (ea-ptr) in offsets[ptr_size]:
+                return ptr
+        ea += ptr_size
+    return None
+
+# --------------------------------------------------------------------------
+def find_malloc_par():
+    mp_ = LocByName("mp_")
+    if mp_ != BADADDR:
+        return mp_
+
+    ptr_size = get_arch_ptrsize()
+    get_ptr = Dword if ptr_size == 4 else Qword
+
+    segm = get_segm_by_name("[heap]")
+    if segm is None:
+        return None
+
+    offset = {
+        4: 48,
+        8: 72
+    }[ptr_size]
+    sbrk_base = segm.startEA
+
+    ea = SegStart(LocByName("_IO_2_1_stdin_"))
+    end_ea = SegEnd(ea)
+
+    while ea < end_ea:
+        ptr = get_ptr(ea)
+        if is_loaded(ptr) and ptr == sbrk_base:
+            return (ea-offset)
+        ea += ptr_size
+
+    return None
+
+# --------------------------------------------------------------------------
+def check_overlap(addr, size, chunk_list):
+    for start, info in chunk_list.iteritems():
+        end = info['end']
+
+        if (addr >= start and addr < end) or \
+            ((addr+size) > start and (addr+size) < end ) or \
+            ((addr < start) and  ((addr + size) >= end)):
+            return start
+    return None
+
+# --------------------------------------------------------------------------
+

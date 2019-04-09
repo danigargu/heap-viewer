@@ -19,6 +19,8 @@ from heap_viewer.ui_widgets import *
 from heap_viewer.ptmalloc import Heap
 from heap_viewer import CONFIG_PATH, ICONS_DIR, PLUGNAME
 
+import heap_viewer.config as config
+
 # -----------------------------------------------------------------------
 class HeapPluginForm(PluginForm):
     def __init__(self):
@@ -28,11 +30,11 @@ class HeapPluginForm(PluginForm):
         self.config      = None
         self.tracer      = None
         self.heap        = None
-        self.cur_arena   = None # default: main_arena
-        self.ptr_size    = get_arch_ptrsize()
+        self.cur_arena   = None
 
     def OnCreate(self, form):
-        self.parent = self.FormToPyQtWidget(form)     
+        config.load()
+        self.parent = self.FormToPyQtWidget(form)
         self.setup_gui()
         self.init_heap()
         self.populate_gui()
@@ -128,7 +130,7 @@ class HeapPluginForm(PluginForm):
                 self.show_warning("Heap not initialized")
                 return
 
-            if not get_libc_base():
+            if not config.libc_base:
                 self.show_warning("Unable to resolve glibc base address.")
                 return
 
@@ -146,36 +148,18 @@ class HeapPluginForm(PluginForm):
             self.show_warning(e.message)
             warning(traceback.format_exc())
 
-    def init_heap(self):
-        try:            
-            self.config_path = CONFIG_PATH
-            self.config = HeapConfig(self.config_path)
+    def init_heap(self, from_update=False):
+        try:
             self.config_widget.load_config()
+            self.heap = Heap()
+            self.btn_reload.setEnabled(True)
+            self.tabs.setTabEnabled(3, self.heap.tcache_enabled)
 
         except Exception as e:
-            self.config = None
-            self.show_warning('Please, update the config file')
+            self.show_warning("Please, fix the config file")
             warning(str(e))
             return
 
-        if not self.config.offsets:
-            arch_bits = self.ptr_size * 8
-            self.show_warning('Config: Libc offsets for %d bits not found.' % arch_bits)
-            return
-
-        try:
-            current_libc_version = get_libc_version()
-            if self.config.libc_version == current_libc_version or current_libc_version == None:
-                self.heap = Heap(self.config)
-                self.btn_reload.setEnabled(True)
-                self.tabs.setTabEnabled(3, self.heap.tcache_enabled)
-            else:
-                self.show_warning('Config: glibc version mismatched: %s != %s' % \
-                    (str(self.config.libc_version), str(current_libc_version)))
-
-        except AttributeError as e:
-            warning(str(e))
-            self.show_warning('Invalid config file content')
          
 
     def populate_arenas(self):
@@ -186,7 +170,6 @@ class HeapPluginForm(PluginForm):
         for addr, arena in self.heap.arenas():
             if addr == self.heap.main_arena_addr:
                 self.cb_arenas.addItem("main_arena", None)
-                self.cb_arenas.addItem("main_arena2", 1)
             else:
                 self.cb_arenas.addItem("0x%x" % addr, addr)
 
@@ -208,6 +191,12 @@ class HeapPluginForm(PluginForm):
 
     def show_chunk_info(self, address):
         self.chunk_widget.show_chunk(address)
+
+    def check_freeable(self, address):
+        self.tabs.setCurrentIndex(4)
+        self.magic_widget.cb_magic.setCurrentIndex(6)
+        self.magic_widget.freeable_widget.t_chunk_addr.setText("%#x" % address)
+        self.magic_widget.freeable_widget.check_freeable()
 
     def Show(self):
         return PluginForm.Show(self, PLUGNAME, options = (

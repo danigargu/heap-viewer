@@ -1,15 +1,7 @@
 {
-  "libc_offsets": {
-    "32": {
-      "global_max_fast": 1784032,
-      "main_arena": 1779584,
-      "mp_": 1777952
-    },
-    "64": {
-      "global_max_fast": 3958776,
-      "main_arena": 3951392,
-      "mp_": 3948896
-    }
-  },
-  "libc_version": "2.23"
+    "stop_during_tracing": true, 
+    "detect_double_frees_and_overlaps": true, 
+    "start_tracing_at_startup": true,
+    "hexdump_limit": 1024, 
+    "libc_offsets": {}
 }

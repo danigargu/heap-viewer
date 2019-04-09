@@ -6,6 +6,7 @@
 
 import json
 import traceback
+import tempfile
 
 from idc import *
 from idautils import *
@@ -13,17 +14,23 @@ from idaapi import *
 
 from ctypes import *
 from collections import OrderedDict
+from cgi import escape as html_encode
 
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtGui import QColor, QFont
 from PyQt5.QtWidgets import QWidget, QCheckBox, QLabel, QAction, QTextEdit
 from PyQt5.QtWidgets import QSplitter, QListWidget, QVBoxLayout, QHBoxLayout
-from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QDialog
 
 from heap_viewer.misc import *
+from heap_viewer.ptmalloc import *
 from heap_viewer.tracer import HeapTracer
 from heap_viewer.bingraph import BinGraph
 from heap_viewer.io_file import parse_io_file_structs
+
+import heap_viewer.config as config
+import heap_viewer.villoc as villoc
+
 
 # -----------------------------------------------------------------------
 class TTable(QTableWidget):
@@ -73,6 +80,7 @@ class TTable(QTableWidget):
             result += ';'.join(columns) + "\n"
         return result
 
+
     def resize_columns(self, widths):
         for i, val in enumerate(widths):
             self.setColumnWidth(i, val)
@@ -80,6 +88,13 @@ class TTable(QTableWidget):
     def resize_to_contents(self):
         self.resizeRowsToContents()
         self.resizeColumnsToContents()
+
+    def set_row_color(self, num_row, color):
+        for i in range(self.columnCount()):
+            self.item(num_row, i).setBackground(color)
+
+    def clear_table(self):
+        self.setRowCount(0)
 
 # -----------------------------------------------------------------------
 class CustomWidget(QWidget):
@@ -98,12 +113,152 @@ class CustomWidget(QWidget):
     def _create_gui(self):
         raise NotImplementedError
 
+
+# -----------------------------------------------------------------------
+class InfoDialog(QDialog):
+    def __init__(self, info, parent=None):
+        QDialog.__init__(self)
+        self.parent = parent
+        self.info = info
+        self._create_gui()
+        self.setModal(False)
+
+    def _create_gui(self):
+        self.t_info = QtWidgets.QTextEdit()
+        self.t_info.setReadOnly(True)
+        self.t_info.setFixedHeight(300)
+        self.t_info.setFixedWidth(600)
+        self.t_info.insertHtml(self.info)
+
+        hbox = QHBoxLayout()
+        hbox.addWidget(self.t_info)
+        self.setLayout(hbox)
+
+
+# -----------------------------------------------------------------------
+class ChunkEditor(QDialog):
+    def __init__(self, addr, parent=None):
+        QDialog.__init__(self)
+        self.addr = addr
+        self.parent = parent
+        self.chunk = None
+        self._create_gui()
+        self._populate_gui()
+
+    def _create_gui(self):
+        lbl = QLabel("0x%X" % self.addr)
+        lbl.setStyleSheet("font-weight: bold")
+
+        form = QtWidgets.QFormLayout()
+        form.setLabelAlignment(QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.t_prev_size = QtWidgets.QLineEdit()
+        self.t_size = QtWidgets.QLineEdit()
+        self.t_fd = QtWidgets.QLineEdit()
+        self.t_bk = QtWidgets.QLineEdit()
+        self.t_fd_nextsize = QtWidgets.QLineEdit()
+        self.t_bk_nextsize = QtWidgets.QLineEdit()
+
+        widgets = [
+            self.t_prev_size,
+            self.t_size,
+            self.t_fd,
+            self.t_bk,
+            self.t_fd_nextsize,
+            self.t_bk_nextsize
+        ]
+        for w in widgets:
+            w.setFixedWidth(170)
+
+        groupbox_flags = QtWidgets.QGroupBox()
+        self.f_prev_inuse = QCheckBox("prev_inuse")
+        self.f_is_mmaped = QCheckBox("is_mmapped")
+        self.f_non_main_arena = QCheckBox("non_main_arena")
+
+        vbox_flags = QVBoxLayout()
+        vbox_flags.addWidget(self.f_prev_inuse)
+        vbox_flags.addWidget(self.f_is_mmaped)
+        vbox_flags.addWidget(self.f_non_main_arena)
+        groupbox_flags.setLayout(vbox_flags)
+
+        form.addRow(lbl)
+        form.addRow(QLabel())
+        form.addRow("prev_size", self.t_prev_size)
+        form.addRow("size", self.t_size)
+        form.addRow("fd", self.t_fd)
+        form.addRow("bk", self.t_bk)
+        form.addRow("fd_nextsize", self.t_fd_nextsize)
+        form.addRow("bk_nextsize", self.t_bk_nextsize)
+        form.addRow("flags", groupbox_flags)
+
+        self.btn_cancel = QtWidgets.QPushButton("Cancel")
+        self.btn_cancel.clicked.connect(self.btn_cancel_on_click)
+        self.btn_save = QtWidgets.QPushButton("Save")
+        self.btn_save.clicked.connect(self.btn_save_on_click)
+
+        form.addRow(QLabel())
+        form.addRow(self.btn_cancel, self.btn_save)
+        self.setLayout(form)
+
+    def _populate_gui(self):
+        chunk = self.parent.heap.get_chunk(self.addr)
+
+        self.t_prev_size.setText("%#x" % chunk.prev_size)
+        self.t_size.setText("%#x" % chunk.norm_size)
+        self.t_fd.setText("%#x" % chunk.fd)
+        self.t_bk.setText("%#x" % chunk.bk)
+        self.t_fd_nextsize.setText("%#x" % chunk.fd_nextsize)
+        self.t_bk_nextsize.setText("%#x" % chunk.bk_nextsize)
+
+        self.f_prev_inuse.setChecked(chunk.prev_inuse)
+        self.f_is_mmaped.setChecked(chunk.is_mmapped)
+        self.f_non_main_arena.setChecked(chunk.non_main_arena)
+
+        self.chunk = chunk
+
+    def btn_cancel_on_click(self):
+        self.done(0)
+
+    def btn_save_on_click(self):
+        flags = 0
+        if self.f_prev_inuse.isChecked():
+            flags |= PREV_INUSE
+        if self.f_is_mmaped.isChecked():
+            flags |= IS_MMAPPED
+        if self.f_non_main_arena.isChecked():
+            flags |= NON_MAIN_ARENA
+
+        try:
+            size = eval(self.t_size.text())
+            size |= flags
+
+            fd = eval(self.t_fd.text())
+            bk = eval(self.t_fd.text())
+            fd_nextsize = eval(self.t_fd_nextsize.text())
+            bk_nextsize = eval(self.t_bk_nextsize.text())
+
+            self.chunk.size = size
+            self.chunk.fd = fd
+            self.chunk.bk = bk
+            self.chunk.fd_nextsize = fd_nextsize
+            self.chunk.bk_nextsize = bk_nextsize
+
+            patch_bytes(self.addr, self.chunk.data)
+            info("Chunk saved!")
+            self.done(1)
+
+        except Exception as e:
+            warning("ERROR: " + str(e))
+
+
 # -----------------------------------------------------------------------
 class TracerWidget(CustomWidget):
     def __init__(self, parent=None):
         CustomWidget.__init__(self, parent)
         self.name = "Tracer"
         self.tracer = None
+        self.free_chunks = {}
+        self.allocated_chunks = {}
+        self.row_info = {}
         self._create_gui()
 
     def _create_gui(self):
@@ -111,11 +266,13 @@ class TracerWidget(CustomWidget):
         self._create_menu()     
 
     def _create_table(self):
-        self.tbl_traced_chunks = TTable(['#','User-address', 'Action', 'Arg 1', 'Arg 2', 'Thread', 'Caller', 'Caller address'])
+        self.tbl_traced_chunks = TTable(['#','User-address', 'Action', 'Arg 1', 'Arg 2', \
+            'Thread', 'Caller', 'Info'])
         self.tbl_traced_chunks.setRowCount(0)
         self.tbl_traced_chunks.resize_columns([40, 155, 80, 80, 80, 80, 200, 200])
         self.tbl_traced_chunks.customContextMenuRequested.connect(self.context_menu)
         self.tbl_traced_chunks.itemSelectionChanged.connect(self.show_selected_chunk)
+        self.tbl_traced_chunks.cellDoubleClicked.connect(self.traced_double_clicked)
 
     def _create_menu(self):
         cb_enable_trace = QCheckBox()
@@ -124,13 +281,21 @@ class TracerWidget(CustomWidget):
         
         btn_dump_trace = QtWidgets.QPushButton("Dump trace")
         btn_dump_trace.clicked.connect(self.btn_dump_trace_on_click)
+
+        btn_villoc_trace = QtWidgets.QPushButton("Villoc")
+        btn_villoc_trace.clicked.connect(self.btn_villoc_on_click)
+
+        btn_clear_trace = QtWidgets.QPushButton("Clear")
+        btn_clear_trace.clicked.connect(self.btn_clear_on_click)
         
         hbox_enable_trace = QHBoxLayout()
-        hbox_enable_trace.addWidget(QLabel("Enable trace"))
+        hbox_enable_trace.addWidget(QLabel("Enable tracing"))
         hbox_enable_trace.addWidget(cb_enable_trace)
         hbox_enable_trace.addWidget(QLabel("Stop during tracing"))
         hbox_enable_trace.addWidget(self.cb_stop_during_tracing)
         hbox_enable_trace.addWidget(btn_dump_trace)
+        hbox_enable_trace.addWidget(btn_villoc_trace)
+        hbox_enable_trace.addWidget(btn_clear_trace)
         hbox_enable_trace.addStretch(1)
 
         hbox_trace = QVBoxLayout()
@@ -138,11 +303,16 @@ class TracerWidget(CustomWidget):
         hbox_trace.addWidget(QLabel("Traced chunks"))
         hbox_trace.addWidget(self.tbl_traced_chunks)
 
+        self.cb_stop_during_tracing.setChecked(config.stop_during_tracing)
+        cb_enable_trace.setChecked(config.start_tracing_at_startup)
+
         self.setLayout(hbox_trace)
 
     def context_menu(self, position):
         sender = self.sender()
         menu = QtWidgets.QMenu()
+
+        show_warn_info = None
         
         copy_action = menu.addAction("Copy value")
         copy_row = menu.addAction("Copy row")
@@ -150,6 +320,10 @@ class TracerWidget(CustomWidget):
         jump_to = menu.addAction("Jump to chunk")
         jump_to_u = menu.addAction("Jump to user-data")
         goto_caller = menu.addAction("Jump to caller")
+
+        current_row = self.sender().currentRow()
+        if current_row in self.row_info:
+            show_warn_info = menu.addAction("Show warning info")
 
         chunk_addr = int(sender.item(sender.currentRow(), 1).text(), 16)
         action = menu.exec_(sender.mapToGlobal(position))
@@ -161,23 +335,29 @@ class TracerWidget(CustomWidget):
             sender.copy_selected_row()
 
         elif action == jump_to:
-            idc.Jump(chunk_addr - (self.heap.ptr_size*2))
+            idc.Jump(chunk_addr - (config.ptr_size*2))
 
         elif action == jump_to_u:
             idc.Jump(chunk_addr)
 
         elif action == goto_caller:
-            caller_addr = sender.item(sender.currentRow(), 7).text()
-            if caller_addr:
-                idc.Jump(int(caller_addr, 16))
+            caller_str = str(sender.item(sender.currentRow(), 6).text())
+            if caller_str:
+                idc.Jump(str2ea(caller_str))
 
         elif action == view_chunk:
             self.show_selected_chunk()
 
+        elif show_warn_info and action == show_warn_info:
+            self.traced_double_clicked()
+
     def enable_tracing(self):
-        self.tracer = HeapTracer(self, not self.cb_stop_during_tracing.isChecked())
+        stop_during_tracing = not self.cb_stop_during_tracing.isChecked()
+        self.tracer = HeapTracer(self.append_chunk, stop_during_tracing)
         self.tracer.hook()
         self.parent.tracer = self.tracer 
+        self.free_chunks = {}
+        self.allocated_chunks = {}
         log("Tracer enabled")
     
     def disable_tracing(self):
@@ -195,7 +375,81 @@ class TracerWidget(CustomWidget):
             self.cb_stop_during_tracing.setEnabled(True)
             self.disable_tracing()
 
+    def get_value(self, row, name):
+        cols = {
+            'address': 1,
+            'action': 2,
+            'arg1': 3,
+            'arg2': 4,
+            'thread': 5,
+            'caller': 6,
+            'info': 7
+        }
+        return self.tbl_traced_chunks.item(row, cols[name]).text()
+
+    def dump_table_for_villoc(self):
+        result = ''
+        for i in range(self.tbl_traced_chunks.rowCount()):
+            action = self.get_value(i, "action")
+            info = self.get_value(i, "info")
+
+            if info != "N/A":
+                result += "@villoc(%s) = <void>\n" % info
+
+            if action == "malloc":
+                arg1 = self.get_value(i, "arg1")
+                ret = self.get_value(i, "address")
+                result += "malloc(%d) = " % int(arg1, 16)
+                result += ret if ret.startswith("0x") else '<error>'
+
+            elif action == "free":
+                address = self.get_value(i, "address")
+                result += "free(%s) = <void>" % address
+
+            elif action == "realloc":
+                address = self.get_value(i, "address")
+                arg1 = self.get_value(i, "arg1")
+                arg2 = self.get_value(i, "arg2")
+                result += "realloc(%s, %d) = %s" % (arg1, int(arg2, 16), address)
+
+            elif action == "calloc":
+                address = self.get_value(i, "address")
+                arg1 = self.get_value(i, "arg1")
+                arg2 = self.get_value(i, "arg2")
+                result += "calloc(%d, %d) = %s" % (int(arg1, 16), int(arg2, 16), address)
+
+            result += '\n'
+        return result
+
+    def btn_villoc_on_click(self):
+        if self.tbl_traced_chunks.rowCount() == 0:
+            warning("Empty table")
+            return
+
+        try:
+            villoc.Block.header = config.ptr_size*2
+            villoc.Block.round  = self.parent.heap.malloc_alignment
+            villoc.Block.minsz  = self.parent.heap.min_chunk_size
+
+            result = self.dump_table_for_villoc()
+            html = villoc.build_html(result)
+
+            h, filename = tempfile.mkstemp(suffix='.html')
+
+            with open(filename, 'wb') as f:
+                f.write(html)
+
+            url = QtCore.QUrl.fromLocalFile(filename)
+            QtGui.QDesktopServices.openUrl(url)
+
+        except Exception as e:
+            warning(traceback.format_exc())
+
     def btn_dump_trace_on_click(self):
+        if self.tbl_traced_chunks.rowCount() == 0:
+            warning("Empty table")
+            return
+
         filename = AskFile(1, "*.csv", "Select the file to store tracing results")
         if not filename:
             return            
@@ -203,33 +457,257 @@ class TracerWidget(CustomWidget):
             result = self.tbl_traced_chunks.dump_table_as_csv()
             with open(filename, 'wb') as f:
                 f.write(result)
-        except Excetion as e:
-            warning(e.message)
+
+        except Exception as e:
+            warning(traceback.format_exc())
+
+    def btn_clear_on_click(self):
+        self.tbl_traced_chunks.clear_table()
 
     def show_selected_chunk(self):
         items = self.tbl_traced_chunks.selectedItems()
-        chunk_addr = int(items[1].text(), 16)
-        norm_address = "0x%x-0x%x" % (chunk_addr, self.heap.ptr_size * 2)
-        self.parent.show_chunk_info(norm_address)
+        if len(items)>0:
+            chunk_addr = int(items[1].text(), 16)
+            norm_address = "0x%x-0x%x" % (chunk_addr, config.ptr_size * 2)
+            self.parent.show_chunk_info(norm_address)
 
-    def append_traced_chunk(self, addr, action, arg1, arg2, thread_id, caller):
+    def traced_double_clicked(self):
+        current_row = self.sender().currentRow()
+        if current_row in self.row_info:
+            info(self.row_info[current_row])
+
+        """
+        if current_row in self.row_info:
+            i = InfoDialog(self.row_info[current_row])
+            i.show()
+        """
+
+    def update_allocated_chunks(self):
+        for start, info in self.allocated_chunks.iteritems():
+            try:
+                chunk = self.heap.get_chunk(start)
+                if chunk.norm_size != info['size']:
+                    info['size'] = chunk.norm_size
+                    info['end']  = start+chunk.norm_size
+            except:
+                continue
+
+    def malloc_consolidate(self):
+        fastbins = self.heap.get_all_fastbins_chunks(self.cur_arena)
+        if len(fastbins) == 0:
+            return False
+
+        self.free_chunks = {}
+        for addr in fastbins:
+            chunk = self.get_chunk(chunk)
+            self.free_chunks[addr] = {
+                'size': chunk.norm_size,
+                'end': addr+chunk.norm_size
+            }
+        return True
+
+    def append_chunk(self, addr, action, arg1, arg2, thread_id, caller, from_ret=True):
+        warn_msg = None
+        row_msg  = None
+        row_color = None
+
+        warn_types = {
+            'overlap': ['Overlap detected', QtGui.QColor(255,204,0)],
+            'double_free': ['Double free detected', QtGui.QColor(255,153,102)]
+        }
+
+        if addr == 0:
+            return
+
+        if action == "free" and from_ret:
+            self.parent.reload_gui_info()
+            return
+
+        if config.detect_double_frees_and_overlaps:
+
+            if action == "malloc":
+                chunk_addr = self.heap.mem2chunk(addr)
+                chunk_size = self.heap.get_chunk(chunk_addr).norm_size
+                chunk_end  = chunk_addr+chunk_size
+
+                chunk = {
+                    'size': chunk_size,
+                    'end':  chunk_end
+                }
+                overlap = check_overlap(chunk_addr, chunk_size, self.allocated_chunks)
+                if overlap is not None:
+
+                    overlap_size = self.allocated_chunks[overlap]['size']
+                    row_msg = "<h3>Heap overlap detected</h3>"
+                    row_msg += "<ul><li>malloc(<b>%d</b>) = <b>%#x</b> (<b>%#x</b>) of size %#x</li>\n" % \
+                         (arg1, addr, chunk_addr, chunk_size)
+                    row_msg += "<li><b>%#x</b> overlaps in-used chunk (<b>%#x</b>) " % (chunk_addr, overlap)
+                    row_msg += "of size <b>%#x</b></li></ul>\n" % overlap_size
+
+                    warn_msg, row_color = warn_types['overlap']
+                    del self.allocated_chunks[overlap]
+
+                self.allocated_chunks[chunk_addr] = chunk
+
+                if chunk_addr in self.free_chunks:
+                    free_chunk = self.free_chunks[chunk_addr]
+
+                    del self.free_chunks[chunk_addr]
+
+                    if chunk['size'] != free_chunk['size']:
+                        split_addr = chunk_addr + chunk_size
+                        split_size = free_chunk['size']-chunk['size']
+                        split_end  = split_addr+split_size
+
+                        self.free_chunks[split_addr] = {
+                            'size': split_size,
+                            'end': split_end
+                        }
+
+                if arg1 >= self.heap.min_large_size:
+                    """ If this is a large request, consolidate fastbins """
+                    self.malloc_consolidate()
+
+            elif action == "free":
+
+                chunk_addr = self.heap.mem2chunk(addr)
+                chunk = self.heap.get_chunk(chunk_addr)
+                chunk_size = chunk.norm_size
+                prev_inuse = chunk.prev_inuse
+                chunk_end  = chunk_addr+chunk_size
+
+                overlap = check_overlap(chunk_addr, chunk_size, self.free_chunks)
+                if overlap is not None:
+
+                    row_msg = "<h3>Double free detected</h3>"
+                    row_msg += "<ul><li>free (<b>%#x</b>) of size <b>%#x</b></li>" % \
+                        (chunk_addr, chunk_size)
+                    row_msg += "<li>Double free: <b>%#x</b> of size <b>%#x</b></li></ul>\n" % \
+                         (overlap, self.free_chunks[overlap]['size'])
+
+                    warn_msg, row_color = warn_types['double_free']
+                    del self.free_chunks[overlap]
+
+
+                in_tcache = False
+                tc_idx = self.heap.csize2tidx(chunk_size)
+
+                if self.heap.tcache_enabled and tc_idx < TCACHE_BINS:
+
+                    tcache = self.heap.get_tcache_struct(self.cur_arena)
+                    tc_idx = self.heap.csize2tidx(chunk_size)
+
+                    if tcache.counts[tc_idx] < TCACHE_COUNT:
+                        self.free_chunks[chunk_addr] = {
+                            'size': chunk_size,
+                            'end': chunk_end
+                        }
+                        in_tcache = True
+
+                        if chunk_addr in self.allocated_chunks:
+                            del self.allocated_chunks[chunk_addr]
+
+                if not in_tcache:
+
+                    # fastbins
+                    if chunk_size <= config.ptr_size*16:
+
+                        self.free_chunks[chunk_addr] = {
+                            'size': chunk_size,
+                            'end': chunk_end
+                        }
+
+                        if chunk_addr in self.allocated_chunks:
+                            del self.allocated_chunks[chunk_addr]
+
+                    # > global_max_fast
+                    else:
+                        if prev_inuse == 0:
+                            prev_size = chunk.prev_size
+                            prev_addr = chunk_addr-prev_size
+
+                            if prev_addr in self.free_chunks:
+                                prev_size += chunk_size
+                                del self.free_chunks[prev_addr]
+                            else:
+                                warning("prev chunk (freed) not in free_chunks list: %#x" % prev_addr)
+
+                        next_chunk = {}
+                        av = self.heap.get_arena(self.cur_arena)
+                        next_addr = chunk_addr + chunk_size
+
+                        if next_addr == av.top:
+                            warning("next_addr = arena.top")
+                            if chunk_addr in self.allocated_chunks:
+                                del self.allocated_chunks[chunk_addr]
+
+                        else:
+                            next_chunk = self.heap.get_chunk(next_addr)
+                            next_size  = next_chunk.norm_size
+                            next_inuse = self.heap.get_chunk(next_addr+next_size).prev_inuse
+
+                            if next_inuse == 0:
+
+                                if prev_inuse:
+                                    if next_addr in self.free_chunks:
+                                        chunk_size += next_size
+                                        del self.free_chunks[next_addr]
+                                else:
+                                    if next_addr in self.free_chunks:
+                                        prev_size += next_size
+                                        del self.free_chunks[next_addr]
+
+                            # prev freed
+                            if prev_inuse == 0:
+                                if chunk_addr in self.allocated_chunks:
+                                    del self.allocated_chunks[chunk_addr]
+
+                                chunk_addr = prev_addr
+                                chunk_size = prev_size
+                                chunk_end  = prev_addr+prev_size
+
+
+                            self.free_chunks[chunk_addr] = {
+                                'size': chunk_size,
+                                'end': chunk_end
+                            }
+
+                            if chunk_addr in self.allocated_chunks:
+                                del self.allocated_chunks[chunk_addr]
+
+                            if chunk_size > 0x10000:
+                                self.malloc_consolidate()
+                                warning("Malloc consolidate. chunk_size = %d" % chunk_size)
+
+
+            elif action == "realloc":
+                self.update_allocated_chunks()
+
         num_rows = self.tbl_traced_chunks.rowCount()
+        if row_msg is not None:
+            self.row_info[num_rows] = row_msg
 
         self.tbl_traced_chunks.setSortingEnabled(False)
         self.tbl_traced_chunks.insertRow(num_rows)
 
-        caller_name_offset = get_func_name_offset(caller)
-        arg1 = "0x%x" % arg1 if arg1 else 'N/A'
-        arg2 = "0x%x" % arg2 if arg2 else 'N/A'
+        caller_name = ''
+        if caller:
+            caller_name = get_func_name_offset(caller)
+            if caller_name is None:
+                caller_name = '%#x' % caller
+
+        arg1 = "%#x" % arg1 if arg1 is not None else 'N/A'
+        arg2 = "%#x" % arg2 if arg2 is not None else 'N/A'
+        warn_msg_s = warn_msg if warn_msg else 'N/A'
 
         it_count  = QTableWidgetItem("%d" % num_rows)
-        it_chunk  = QTableWidgetItem("0x%x" % addr)
-        it_action = QTableWidgetItem("%s" % action)
+        it_chunk  = QTableWidgetItem("%#x" % addr)
+        it_action = QTableWidgetItem(action)
         it_arg1 = QTableWidgetItem(arg1)
         it_arg2 = QTableWidgetItem(arg2)
         it_thread = QTableWidgetItem("%d" % thread_id)
-        it_caller = QTableWidgetItem("%s" % caller_name_offset)
-        it_caller_a = QTableWidgetItem("0x%x" % caller)
+        it_caller = QTableWidgetItem(caller_name)
+        it_info = QTableWidgetItem(warn_msg_s)
         
         self.tbl_traced_chunks.setItem(num_rows, 0, it_count)
         self.tbl_traced_chunks.setItem(num_rows, 1, it_chunk)
@@ -238,16 +716,22 @@ class TracerWidget(CustomWidget):
         self.tbl_traced_chunks.setItem(num_rows, 4, it_arg2)
         self.tbl_traced_chunks.setItem(num_rows, 5, it_thread)
         self.tbl_traced_chunks.setItem(num_rows, 6, it_caller)
-        self.tbl_traced_chunks.setItem(num_rows, 7, it_caller_a)
-        
+        self.tbl_traced_chunks.setItem(num_rows, 7, it_info)
+
         self.tbl_traced_chunks.resizeRowsToContents()
         self.tbl_traced_chunks.setSortingEnabled(True)
-        self.parent.reload_gui_info()
+
+        if warn_msg:
+            self.tbl_traced_chunks.set_row_color(num_rows, row_color)
+
+        if from_ret:
+            self.parent.reload_gui_info()
 
 # -----------------------------------------------------------------------
 class ChunkWidget(CustomWidget):
     def __init__(self, parent=None):
         CustomWidget.__init__(self, parent)
+        self.setMinimumWidth(400)
         self._create_gui()
 
     def _create_gui(self):        
@@ -262,23 +746,41 @@ class ChunkWidget(CustomWidget):
         self.btn_jump_chunk = QtWidgets.QPushButton("Jump")
         self.btn_jump_chunk.clicked.connect(self.jump_on_click)
 
+        self.btn_next_chunk = QtWidgets.QPushButton("Next")
+        self.btn_next_chunk.clicked.connect(self.next_on_click)
+
+        self.btn_prev_chunk = QtWidgets.QPushButton("Prev")
+        self.btn_prev_chunk.clicked.connect(self.prev_on_click)
+
+        self.btn_edit_chunk = QtWidgets.QPushButton("Edit")
+        self.btn_edit_chunk.clicked.connect(self.edit_chunk_on_click)
+
         hbox_chunk_address = QHBoxLayout()
-        hbox_chunk_address.addWidget(QLabel("Chunk address:"))
+        hbox_chunk_address.addWidget(QLabel("Chunk address "))
         hbox_chunk_address.addWidget(self.t_chunk_addr)
-        hbox_chunk_address.addWidget(self.btn_view_chunk)
-        hbox_chunk_address.addWidget(self.btn_jump_chunk)
+        hbox_chunk_address.setContentsMargins(0, 0, 0, 0)
+        hbox_chunk_address.setSpacing(0)
         hbox_chunk_address.addStretch(1)
 
+        hbox_btns = QHBoxLayout()
+        hbox_btns.addWidget(self.btn_view_chunk)
+        hbox_btns.addWidget(self.btn_jump_chunk)
+        hbox_btns.addWidget(self.btn_next_chunk)
+        hbox_btns.addWidget(self.btn_prev_chunk)
+        hbox_btns.addWidget(self.btn_edit_chunk)
+        hbox_btns.addStretch(1)
 
         self.te_chunk_info = QtWidgets.QTextEdit()
         self.te_chunk_info.setReadOnly(True)
 
-        hbox_arena = QVBoxLayout()        
-        hbox_arena.addLayout(hbox_chunk_address)
-        hbox_arena.addWidget(self.te_chunk_info)
+        hbox = QVBoxLayout()
+        hbox.addLayout(hbox_chunk_address)
+        hbox.addLayout(hbox_btns)
+        hbox.addWidget(self.te_chunk_info)
+        hbox.setSpacing(3)
 
         groupbox_arena_info = QtWidgets.QGroupBox('Chunk info')
-        groupbox_arena_info.setLayout(hbox_arena)
+        groupbox_arena_info.setLayout(hbox)
 
         hbox_actions = QVBoxLayout()
         hbox_actions.addWidget(groupbox_arena_info)
@@ -327,25 +829,32 @@ class ChunkWidget(CustomWidget):
         chunk_table += '</table>'
         return chunk_table
 
-    def html_chunk_hexdump(self, chunk):
-        hexdump = '<p>'
-        hexdump = '+%02d | ' % 0
+    def html_chunk_hexdump(self, data, splitted):
+        hexdump = '<code>'
         line = ''
+        data_len = len(data)
+        spaces = len(str(data_len))
+        fmt_offset = "+%-{0}d | ".format(spaces)
+        hexdump += fmt_offset % 0
 
-        for i in range(len(chunk.data)):
-            char = chunk.data[i]
+        #for i in range(len(chunk.data)):
+        for i in range(len(data)):
+            char = data[i]
             hexdump += "%02X " % ord(char)
 
-            # Fix
             char = re.sub(r'[<>\'"]', '\x00', char)
             line += char if 0x20 <= ord(char) <= 0x7e else '.'
 
-            if (i+1) % self.heap.ptr_size == 0 and i != (len(chunk.data)-1):
+            if (i+1) % config.ptr_size == 0 and i != (len(data)-1):
                 hexdump += ' | %s<br>' % line
-                hexdump += '+%02d | ' % (i+1)
+                hexdump += fmt_offset % (i+1)
                 line = ''
-        hexdump += ' | %s</p>' % line
+        hexdump += ' | %s<br>' % line
 
+        if splitted:
+            hexdump += "<br>[...]<br>"
+
+        hexdump += "</code>"
         return hexdump
 
 
@@ -366,37 +875,53 @@ class ChunkWidget(CustomWidget):
             #hexdump {
                 font-family:Monaco;
                 font-size:12px;
+                white-space:pre;
             }
         </style>
-        <p><b>[ chunk @ 0x%x ]</b><br>
+        <p><b>[ 0x%x ]</b><br>
         <!-- Chunk fields -->
         %s
         <br>
         <p><b>[ hexdump ]</b></p>
         <p id="hexdump";>%s</p>
-        '''        
+        '''
 
-        try:
-            chunk_addr = int(eval(self.t_chunk_addr.text()))
-        except:
+        chunk_addr = self.get_current_addr()
+
+        if chunk_addr is None:
             warning("Invalid expression")
             return
 
         try:
+            splitted = False
             in_use = None
+            chunk_data = ""
+            chunk_hexdump = ""
             chunk = self.heap.get_chunk(chunk_addr)
+            chunk_bytes = chunk.norm_size
+      
+            if chunk_bytes > config.hexdump_limit: 
+                chunk_bytes = config.hexdump_limit
+                splitted = True
+
+            if chunk_bytes > 0 and is_loaded(chunk_addr + chunk_bytes):
+                chunk_data = get_bytes(chunk_addr, chunk_bytes)
+            else:
+                chunk_data = chunk.data
 
             if is_loaded(chunk_addr + chunk.norm_size):
                 in_use = self.heap.next_chunk(chunk_addr).prev_inuse
 
             chunk_table = self.html_chunk_table(chunk, in_use)
-            chunk_hexdump = self.html_chunk_hexdump(chunk)
+            if chunk_data:
+                chunk_hexdump = self.html_chunk_hexdump(chunk_data, splitted)
 
             self.te_chunk_info.clear()
             chunk_info = chunk_template % (chunk_addr, chunk_table, chunk_hexdump)
             self.te_chunk_info.insertHtml(chunk_info)
-        except:
-            warning("Invalid chunk address")
+
+        except Exception as e:
+            warning("ERROR: " + str(e))
             #warning(traceback.format_exc())
 
     def show_chunk(self, expr):
@@ -406,13 +931,58 @@ class ChunkWidget(CustomWidget):
             self.t_chunk_addr.setText("0x%x" % expr)
         self.view_chunk_on_click()
 
+    def get_current_addr(self):
+        ea = None
+        try:
+            ea = int(eval(self.t_chunk_addr.text()))
+        except:
+            pass
+        return ea
+
     def jump_on_click(self):
         try:
             chunk_addr = int(eval(self.t_chunk_addr.text()))
             idc.Jump(chunk_addr)
         except:
             warning("Invalid expression")
+
+    def next_on_click(self):
+        chunk_addr = self.get_current_addr()
+        if chunk_addr is None:
+            warning("Invalid expression")
             return
+        try:
+            chunk = self.heap.get_chunk(chunk_addr)
+            chunk_size = chunk.norm_size
+            next_addr = chunk_addr+chunk_size
+            if is_loaded(next_addr):
+                self.show_chunk("%#x" % next_addr)
+            else:
+                warning("%#x: next addr (%#x) is not loaded" % (chunk_addr, next_addr))
+        except Exception as e:
+            warning("ERROR: " + str(e))
+
+    def prev_on_click(self):
+        chunk_addr = self.get_current_addr()
+        if chunk_addr is None:
+            warning("Invalid expression")
+            return
+        try:
+            chunk = self.heap.get_chunk(chunk_addr)
+            if chunk.prev_inuse == 0:
+                prev_addr = chunk_addr-chunk.prev_size
+                self.show_chunk("%#x" % prev_addr)
+            else:
+                warning("%#x: prev_chunk in use" % chunk_addr)
+        except Exception as e:
+            warning("ERROR: " + str(e))
+
+    def edit_chunk_on_click(self):
+        chunk_addr = self.get_current_addr()
+        if chunk_addr is not None:
+            w = ChunkEditor(chunk_addr, self)
+            if w.exec_() == 1:
+                self.view_chunk_on_click()
 
 # -----------------------------------------------------------------------
 class ArenaWidget(CustomWidget):
@@ -437,20 +1007,29 @@ class ArenaWidget(CustomWidget):
         self.lbl_top_warning.setStyleSheet('color: red')
         self.lbl_top_warning.setVisible(False)
 
+        self.t_attached_threads = QtWidgets.QLineEdit()
+        self.t_attached_threads.setFixedWidth(150)
+        self.t_attached_threads.setReadOnly(True)
+
         hbox_arena_top = QHBoxLayout()
         hbox_arena_top.addWidget(QLabel('Top:'))
         hbox_arena_top.addWidget(self.t_top_addr)
         hbox_arena_top.addWidget(QLabel('Last remainder:'))
         hbox_arena_top.addWidget(self.t_last_remainder)
-        hbox_arena_top.addWidget(self.lbl_top_warning)
+        hbox_arena_top.addWidget(QLabel('Attached threads:'))
+        hbox_arena_top.addWidget(self.t_attached_threads)
         hbox_arena_top.addStretch(1)
+
+        hbox_arena_others = QHBoxLayout()
+        hbox_arena_others.addWidget(self.lbl_top_warning)
 
         self.bold_font = QFont()
         self.bold_font.setBold(True)
 
         grid_arenas = QtWidgets.QGridLayout()        
         grid_arenas.addLayout(hbox_arena_top, 0, 0)
-        grid_arenas.addWidget(self.tbl_parsed_heap, 1, 0)
+        grid_arenas.addLayout(hbox_arena_others, 1, 0)
+        grid_arenas.addWidget(self.tbl_parsed_heap, 2, 0)
 
         self.setLayout(grid_arenas)
 
@@ -469,6 +1048,7 @@ class ArenaWidget(CustomWidget):
         view_chunk = menu.addAction("View chunk")
         jump_to = menu.addAction("Jump to chunk")
         jump_to_u = menu.addAction("Jump to user-data")
+        check_freaable = menu.addAction("Check freeable")
 
         chunk_addr = int(sender.item(sender.currentRow(), 0).text(), 16)
         action = menu.exec_(sender.mapToGlobal(position))
@@ -483,10 +1063,13 @@ class ArenaWidget(CustomWidget):
             idc.Jump(chunk_addr)
 
         elif action == jump_to_u:
-            idc.Jump(chunk_addr + (self.heap.ptr_size*2))
+            idc.Jump(chunk_addr + (config.ptr_size*2))
 
         elif action == view_chunk:
             self.show_selected_chunk()
+
+        elif action == check_freaable:
+            self.parent.check_freeable(chunk_addr)
 
     def show_selected_chunk(self):
         items = self.tbl_parsed_heap.selectedItems()
@@ -499,6 +1082,7 @@ class ArenaWidget(CustomWidget):
         arena = self.heap.get_arena(cur_arena)
         self.t_top_addr.setText("0x%x" % arena.top)
         self.t_last_remainder.setText("0x%x" % arena.last_remainder)
+        self.t_attached_threads.setText("%d" % arena.attached_threads)
 
         top_segname = SegName(arena.top)
         if not any(s in top_segname for s in ['heap','debug']):
@@ -1036,7 +1620,7 @@ class TcacheWidget(CustomWidget):
     def show_selected_chunk(self):
         items = self.sender().selectedItems()
         entry_addr = int(items[3].text(), 16)
-        norm_address = "0x%x-0x%x" % (entry_addr, self.heap.ptr_size * 2)
+        norm_address = "0x%x-0x%x" % (entry_addr, config.ptr_size * 2)
         self.parent.show_chunk_info(norm_address)
 
 
@@ -1161,11 +1745,11 @@ class UnlinkWidget(CustomWidget):
         """
 
         unlinkable = (fd_chunk.bk == p and bk_chunk.fd == p) and \
-            (chunk.size == next_chunk.prev_size)
+            (chunk.norm_size == next_chunk.prev_size)
 
         unlinkable_s = str(unlinkable)
 
-        unlink_info = info_template % (unlinkable_s, unlinkable_s, p, chunk.size, next_chunk.prev_size, 
+        unlink_info = info_template % (unlinkable_s, unlinkable_s, p, chunk.norm_size, next_chunk.prev_size, 
             chunk.bk, chunk.fd, fd_chunk.bk, bk_chunk.fd, chunk.fd+bk_offset, chunk.bk, 
             chunk.bk+fd_offset, chunk.fd)
 
@@ -1209,7 +1793,7 @@ class HouseOfForceWidget(CustomWidget):
         arena = self.heap.get_arena(self.cur_arena)
         target_addr = int(self.t_house_force_addr.text(), 16)
 
-        ptr_size = self.heap.ptr_size
+        ptr_size = config.ptr_size
 
         top_size_ptr = arena.top + ptr_size
         top_size_val = self.heap.get_ptr(top_size_ptr)
@@ -1507,6 +2091,7 @@ class MagicWidget(CustomWidget):
         self.cb_magic.addItem('Useful libc offsets')
         self.cb_magic.addItem('Calc chunk size')
         self.cb_magic.addItem('IO_FILE structs')
+        self.cb_magic.addItem('Freeable chunk')
         self.cb_magic.currentIndexChanged[int].connect(self.cb_magic_changed)
 
         self.stacked_magic = QtWidgets.QStackedWidget()
@@ -1517,6 +2102,7 @@ class MagicWidget(CustomWidget):
         self.libc_offsets_widget = LibcOffsetsWidget(self)
         self.req2size_widget = Req2sizeWidget(self)
         self.io_file_widget = IOFileWidget(self)
+        self.freeable_widget = FreeableWidget(self)
 
         self.stacked_magic.addWidget(self.unlink_widget)
         self.stacked_magic.addWidget(self.fakefast_widget)
@@ -1524,6 +2110,7 @@ class MagicWidget(CustomWidget):
         self.stacked_magic.addWidget(self.libc_offsets_widget)
         self.stacked_magic.addWidget(self.req2size_widget)
         self.stacked_magic.addWidget(self.io_file_widget)
+        self.stacked_magic.addWidget(self.freeable_widget)
 
         hbox_magic = QHBoxLayout()
         hbox_magic.addWidget(QLabel('Select util'))
@@ -1551,45 +2138,121 @@ class ConfigWidget(CustomWidget):
         self._create_gui()
 
     def _create_gui(self):
-        hbox_update_config = QHBoxLayout()
+        
         self.t_config = QtWidgets.QTextEdit()
-        self.btn_update_config = QtWidgets.QPushButton("Update")
-        self.btn_update_config.clicked.connect(self.update_config_on_click)
-        self.t_config.setFixedHeight(400)
+        self.t_config.setFixedHeight(440)
 
-        hbox_update_config.addWidget(QLabel('Libc config (config.json)'))
+        self.btn_update_config = QtWidgets.QPushButton("Update")
+        self.btn_dump_config = QtWidgets.QPushButton("Dump json")
+
+        self.btn_update_config.clicked.connect(self.update_config)
+        self.btn_dump_config.clicked.connect(self.dump_config)
+
+        hbox_update_config = QHBoxLayout()        
+        hbox_update_config.addWidget(QLabel("Config file (config.json)"))
         hbox_update_config.addWidget(self.btn_update_config)
+        hbox_update_config.addWidget(self.btn_dump_config)
         hbox_update_config.addStretch(1)
 
-        vbox_config = QVBoxLayout()
-        vbox_config.addLayout(hbox_update_config)
-        vbox_config.addWidget(self.t_config)
-        vbox_config.addStretch(1)
+        groupbox_tracer = QtWidgets.QGroupBox("Tracer options")
+        self.opt1 = QCheckBox("Start tracing at startup")
+        self.opt2 = QCheckBox("Stop during tracing")
+        self.opt3 = QCheckBox("Detect double frees and chunk overlaps")
 
-        self.setLayout(vbox_config)
+        vbox_tracer = QVBoxLayout()
+        vbox_tracer.addWidget(self.opt1)
+        vbox_tracer.addWidget(self.opt2)
+        vbox_tracer.addWidget(self.opt3)
+        groupbox_tracer.setLayout(vbox_tracer)
+
+        vbox_options = QVBoxLayout()
+        vbox_options.addWidget(QtWidgets.QTextEdit("Hexdump limit"))
+
+        hbox_hex_limit = QHBoxLayout()
+        self.t_hexdump_limit = QtWidgets.QLineEdit()
+        self.t_hexdump_limit.setFixedWidth(180)
+        hbox_hex_limit.addWidget(QLabel("Hexdump limit (bytes)"))
+        hbox_hex_limit.addWidget(self.t_hexdump_limit)
+        hbox_hex_limit.addStretch(1)
+
+        vbox_offsets = QVBoxLayout()
+
+        form_offsets = QtWidgets.QFormLayout()
+        form_offsets.setSpacing(5)
+        form_offsets.setLabelAlignment(QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+
+        self.t_main_arena = QtWidgets.QLineEdit()
+        self.t_malloc_par = QtWidgets.QLineEdit()
+        self.t_global_max_fast = QtWidgets.QLineEdit()
+
+        self.offset_widgets = {
+            'main_arena': self.t_main_arena,
+            'malloc_par': self.t_malloc_par,
+            'global_max_fast': self.t_global_max_fast
+        }
+
+        form_offsets.addRow("main_arena", self.t_main_arena)
+        form_offsets.addRow("mp_ (malloc_par)", self.t_malloc_par)
+        form_offsets.addRow("global_max_fast", self.t_global_max_fast)
+
+
+        groupbox_offsets = QtWidgets.QGroupBox("glibc offsets (optional)")
+        groupbox_offsets.setLayout(form_offsets)
+
+        hbox_groupboxs = QHBoxLayout()
+        hbox_groupboxs.addWidget(groupbox_tracer)
+        hbox_groupboxs.addWidget(groupbox_offsets)
+        hbox_groupboxs.addStretch(1)
+
+        vbox = QVBoxLayout()
+        vbox.addLayout(hbox_update_config)
+        vbox.addLayout(hbox_groupboxs)
+        vbox.addLayout(hbox_hex_limit)
+        vbox.addStretch(1)
+        self.setLayout(vbox)
+
+    def get_offsets(self):
+        offsets = {}
+        for name, widget in self.offset_widgets.iteritems():
+            try:
+                value = int(widget.text())
+                offsets[name] = value
+            except:
+                pass
+        return offsets
 
     def load_config(self):
+        self.opt1.setChecked(config.start_tracing_at_startup)
+        self.opt2.setChecked(config.stop_during_tracing)
+        self.opt3.setChecked(config.detect_double_frees_and_overlaps)
+        self.t_hexdump_limit.setText("%d" % config.hexdump_limit)
+
+        if type(config.libc_offsets) is dict:
+            for name, widget in self.offset_widgets.iteritems():
+                value = config.libc_offsets.get(name)
+                if value is not None:
+                    widget.setText("%d" % value)
+
+    def update_config(self):
         try:
-            self.t_config.setText(self.parent.config.dump_config())
-        except:
-            self.t_config.setText('')
+            config.start_tracing_at_startup = self.opt1.isChecked()
+            config.stop_during_tracing = self.opt2.isChecked()
+            config.detect_double_frees_and_overlaps = self.opt3.isChecked()
+            config.hexdump_limit = int(self.t_hexdump_limit.text())
+            config.libc_offsets = self.get_offsets()
 
-    def update_config_on_click(self):
-        try:
-            config = json.loads(self.t_config.toPlainText())
-            with open(self.parent.config_path, 'wb') as f:
-                f.write(json.dumps(config, indent=4))
+            config.save()
+            info("Config updated!")
 
-            answer = askyn_c(
-                ASKBTN_YES, 
-                "HIDECANCEL\nConfig updated. Do you want to restart the plugin to apply the changes?")
-
-            if answer == ASKBTN_YES:
-                self.parent.Close(1)
-                self.parent.Show()
+            self.parent.init_heap(from_update=True)
+            self.parent.reload_gui_info()
 
         except Exception as e:
-            warning("Error: %s" % traceback.format_exc())
+            warning("ERROR: " + str(e))
+
+    def dump_config(self):
+        info(config.dump())
+
 
 # -----------------------------------------------------------------------
 class Req2sizeWidget(CustomWidget):
@@ -1789,6 +2452,84 @@ class IOFileWidget(CustomWidget):
             cursor = obj.textCursor()
             cursor.setPosition(0)
             obj.setTextCursor(cursor)
+
+# -----------------------------------------------------------------------
+class FreeableWidget(CustomWidget):
+    def __init__(self, parent=None):
+        CustomWidget.__init__(self, parent)
+        self._create_gui()
+
+    def _create_gui(self):
+        self.t_chunk_addr = QtWidgets.QLineEdit()
+        self.t_chunk_addr.setFixedWidth(150)
+
+        self.t_freeable_info = QtWidgets.QTextEdit()
+        self.t_freeable_info.setFixedHeight(400)
+        self.t_freeable_info.setReadOnly(True)
+
+        self.btn_freeable = QtWidgets.QPushButton("Check")
+        self.btn_freeable.clicked.connect(self.check_freeable)
+
+        hbox_freeable = QHBoxLayout()
+        hbox_freeable.addWidget(QLabel('Chunk address'))
+        hbox_freeable.addWidget(self.t_chunk_addr)
+        hbox_freeable.addWidget(self.btn_freeable)
+        hbox_freeable.addStretch(1)
+
+        vbox = QVBoxLayout()
+        vbox.addLayout(hbox_freeable)
+        vbox.addWidget(self.t_freeable_info)
+        vbox.addStretch(1)
+        vbox.setContentsMargins(0, 0, 0, 0)
+
+        self.setLayout(vbox)
+
+    def check_freeable(self):
+        cur_arena = self.cur_arena
+        chunk_addr = eval(self.t_chunk_addr.text())
+
+        if self.heap is None:
+            warning("Heap not initialized")
+            return
+
+        freeable, errors = self.heap.is_freeable(chunk_addr, cur_arena)
+        freeable_str = str(freeable)
+        html_result = '''
+        <style>
+            td {padding-right: 20px;}
+            body {width: 100%%;}
+            #True {color: green}
+            #False {color: red}
+        </style>
+        <h3>Freaable</h3>
+        <ul>
+            <li><span>0x%x: <b id="%s">%s</b></span></li>
+        </ul>
+        ''' % (chunk_addr, freeable_str, freeable_str)
+
+        if len(errors) > 0:
+            html_result += '<h3>Messages / Errors:</h3>'
+            html_result += '<ul>'
+            for err in errors:
+                html_result += '<li>%s</li>' % html_encode(err)
+            html_result += '</ul>'
+
+        merge_info = self.heap.merge_info(chunk_addr, cur_arena)
+        if merge_info is not None:
+            html_result += '''
+            <h3>Merge info</h3>
+            <ul>
+            '''
+            if type(merge_info) == list:
+                for info in merge_info:
+                    html_result += '<li>%s</li>' % html_encode(info)
+            elif type(merge_info) == str:
+                html_result += '<li>%s</li>' % merge_info
+            html_result += '</ul>'
+
+
+        self.t_freeable_info.clear()
+        self.t_freeable_info.insertHtml(html_result)
 
 # -----------------------------------------------------------------------
 

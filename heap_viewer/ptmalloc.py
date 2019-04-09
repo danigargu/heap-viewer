@@ -12,6 +12,7 @@ from ctypes import *
 from collections import OrderedDict
 
 from heap_viewer.misc import *
+import heap_viewer.config as config
 
 #-----------------------------------------------------------------------
 # Some glibc heap constants
@@ -38,6 +39,9 @@ TCACHE_BINS = 64
 TCACHE_MAX_BYTES = 1032
 TCACHE_COUNT = 7
 
+DL_PAGESIZE = 4096
+
+
 #-----------------------------------------------------------------------
 # struct malloc_par
 
@@ -58,7 +62,7 @@ class malloc_par_32(malloc_par):
         ("no_dyn_threshold",      c_int),
         ("mmapped_mem",           c_uint32),
         ("max_mmapped_mem",       c_uint32),
-        ("max_total_mem",         c_uint32),
+        #("max_total_mem",         c_uint32), # max_total_mem removed in glibc 2.24
         ("sbrk_base",             c_uint32),
         ("tcache_bins",           c_uint32),
         ("tcache_max_bytes",      c_uint32),
@@ -79,7 +83,7 @@ class malloc_par_64(malloc_par):
         ("no_dyn_threshold",      c_int),
         ("mmapped_mem",           c_uint64),
         ("max_mmapped_mem",       c_uint64),
-        ("max_total_mem",         c_uint64),
+        #("max_total_mem",         c_uint64),
         ("sbrk_base",             c_uint64),
         ("tcache_bins",           c_uint64),
         ("tcache_max_bytes",      c_uint64),
@@ -264,47 +268,46 @@ class tcache_perthread_64(LittleEndianStructure):
         ("entries",          c_uint64 * TCACHE_BINS),
     ]
 
+
 # -----------------------------------------------------------------------
 # ptmalloc2 allocator - Glibc Heap
 
 class Heap(object):
-    def __init__(self, config):
-        self.config          = config
+    def __init__(self):
         self.ptr_size        = None
         self.get_ptr         = None
         self.offsets         = None
         self.malloc_state_s  = None
         self.malloc_chunk_s  = None
         self.chunk_offsets   = None
+        self.main_arena_addr = None
         self.arena_offsets   = None
         self.tcache_enabled  = False
         self.initialize()
 
     def initialize(self):
-        self.ptr_size = get_arch_ptrsize()
-        self.libc_base = get_libc_base()
-        self.libc_offsets = self.config.offsets
+        self.ptr_size = config.ptr_size
+        self.libc_base = config.libc_base
+        self.main_arena_addr = config.main_arena
+        self.get_ptr = config.get_ptr
 
-        # TODO: refactor this
         if self.ptr_size == 4:
-            self.get_ptr = Dword
             self.heap_info_s = heap_info_32
             self.malloc_state_s = malloc_state_32
             self.malloc_chunk_s = malloc_chunk_32
             self.tcache_perthread_s = tcache_perthread_32
             
-            if self.config.libc_version > "2.25":
+            if config.libc_version > "2.25":
                 self.tcache_enabled = True
                 self.malloc_state_s = malloc_state_32_new
 
         elif self.ptr_size == 8:
-            self.get_ptr = Qword
             self.heap_info_s = heap_info_64
             self.malloc_state_s = malloc_state_64
             self.malloc_chunk_s = malloc_chunk_64            
             self.tcache_perthread_s = tcache_perthread_64
             
-            if self.config.libc_version > "2.25":
+            if config.libc_version > "2.25":
                 self.tcache_enabled = True
                 self.malloc_state_s = malloc_state_64_new
 
@@ -314,7 +317,7 @@ class Heap(object):
     @property
     def malloc_alignment(self):
         # https://sourceware.org/git/gitweb.cgi?p=glibc.git;a=commit;h=4e61a6be446026c327aa70cef221c9082bf0085d
-        if self.config.libc_version > "2.25" and self.ptr_size == 4:
+        if config.libc_version > "2.25" and self.ptr_size == 4:
             return 16
         return self.ptr_size * 2
 
@@ -336,17 +339,24 @@ class Heap(object):
         return self.ptr_size * 4
 
     @property
-    def main_arena_addr(self):
-        addr = self.libc_base + self.libc_offsets['main_arena']
-        return addr
-
-    @property
     def global_max_fast_addr(self):
         libc_base = self.libc_base
         offset = self.libc_offsets.get('global_max_fast')
         if offset:
             return libc_base + self.offset
         return None
+
+    @property
+    def min_large_size(self):
+        smallbin_width = self.malloc_alignment
+        smallbin_correction = int(self.malloc_alignment > 2 * self.ptr_size)
+        return ((NSMALLBINS - smallbin_correction) * smallbin_width)
+
+    def in_smallbin_range(self, sz):
+        return sz < self.min_large_size
+
+    def aligned_ok(self, m):
+        return (m & self.malloc_align_mask) == 0
 
     def heap_for_ptr(self, ptr):
         return (ptr & ~(HEAP_MAX_SIZE-1))
@@ -417,7 +427,7 @@ class Heap(object):
         return self.generic_chain(address, 0, 0, add_stop) # offset 0: next
 
     def get_struct(self, address, struct_type):
-        assert is_loaded(address) == True, "Invalid ptr detected"
+        assert is_loaded(address) == True, "Can't access memory at 0x%x" % address
         sbytes = get_bytes(address, sizeof(struct_type))
         return struct_type.from_buffer_copy(sbytes)
 
@@ -508,7 +518,7 @@ class Heap(object):
 
     def prev_chunk(self, address):
         chunk = self.get_chunk(address)
-        return address+chunk.prev_size
+        return address-chunk.prev_size
 
     def next_chunk(self, address):
         chunk = self.get_chunk(address)
@@ -682,7 +692,7 @@ class Heap(object):
 
         if fd_chunk.bk != p or bk_chunk.fd != p:
             return False
-        if chunk.size != next_chunk.prev_size:
+        if chunk.norm_size != next_chunk.prev_size:
             return False
 
         return True
@@ -711,4 +721,207 @@ class Heap(object):
             ea += 1
 
         return results
+
+    def is_freeable(self, addr, arena=None):
+        errors = []
+        try:
+            av = self.get_arena(arena)
+            chunk = self.get_chunk(addr)
+            size = chunk.norm_size
+
+            if chunk.is_mmapped:
+                # munmap_chunk
+                block = addr - chunk.prev_size
+                total_size = chunk.prev_size + size
+
+                if ((block | total_size) & (DL_PAGESIZE-1)) != 0:
+                    errors.append("mmapped chunk: invalid pointer.")
+
+            else:
+                if addr > (2**(self.ptr_size*8)) - size:
+                    errors.append("Invalid pointer. addr > -size")
+
+                if addr & self.malloc_align_mask != 0:
+                    errors.append("Invalid pointer. misaligned chunk")
+
+                if size < self.min_chunk_size:
+                    errors.append("Invalid size. 0x%x < 0x%x" % (size, self.min_chunk_size))
+
+                if not self.aligned_ok(size):
+                    errors.append("Invalid size. 0x%x & 0x%x != 0" % (size, self.malloc_align_mask))
+
+                if self.tcache_enabled:
+                    tcache = self.get_tcache_struct(arena)
+                    tc_idx = self.csize2tidx(size)
+
+                    if tc_idx < TCACHE_BINS and tcache.counts[tc_idx] >= TCACHE_COUNT:
+                        counts = tcache.counts[tc_idx]
+                        errors.append("tcache.entries[%d] is full (%d free chunks)" % (tc_idx, counts))
+
+                next_addr   = addr + chunk.norm_size
+                next_chunk  = self.get_chunk(next_addr)
+                next_size   = next_chunk.size
+                chunk_inuse = next_chunk.prev_inuse
+
+                # fastbin checks
+                if size <= self.ptr_size*16:
+                    if next_size <= self.ptr_size*2:
+                        errors.append("Invalid next size (fastbin). next_size (0x%x) <= 0x%x" % \
+                            (next_size, self.ptr_size*2))
+
+                    if next_size >= av.system_mem:
+                        errors.append("Invalid next size (fastbin). next_size (0x%x) <= system_mem(0x%x)" % \
+                            (next_size, av.system_mem))
+
+                    fast_id = self.fastbin_index(size)
+                    old = self.get_fastbin_by_id(fast_id, arena)
+
+                    if addr == old:
+                        errors.append("Double free or corruption. 0x%x == 0x%x (fastbins[%d])" % \
+                            (addr, old, fast_id))
+
+                    if old != 0:
+                        old_chunk = self.get_chunk(old)
+                        old_fast_id = self.fastbin_index(old_chunk.norm_size)
+
+                        if old_fast_id != fast_id:
+                            errors.append("Invalid fastbin entry. fastbin_index_top (%d) != %d" % \
+                                (old_fast_id, fast_id))
+
+                else:
+                    top = av.top
+                    if addr == top:
+                        errors.append("Double free or corruption (top). 0x%x == top (0x%x)" % (addr, top))
+
+                    top_size = self.get_chunk(top).norm_size
+                    if next_addr >= top+top_size:
+                        errors.append("Out of top. next_chunk (0x%x) >= top+top->size (0x%x)" \
+                            % (next_addr, top+top_size))
+
+                    if chunk_inuse == 0:
+                        errors.append("Double free or corruption (!prev_inuse)")
+
+                    if next_size <= self.ptr_size*2:
+                        errors.append("Invalid next size. next_size (0x%x) <= 0x%x" % \
+                            (next_size, self.ptr_size*2))
+
+                    if next_size >= av.system_mem:
+                        errors.append("Invalid next size. next_size (0x%x) <= system_mem (0x%x)" % \
+                            (next_size, av.system_mem))
+
+                    # consolidate backward - unlink
+                    if chunk.prev_inuse == 0:
+                        prev_chunk = self.get_chunk(addr - chunk.prev_size)
+                        if chunk.prev_size != prev_chunk.norm_size:
+                            errors.append("unlink: prev->size (0x%x) != chunk->prev_size (0x%x)" % \
+                                (prev_chunk.norm_size, chunk.prev_size))
+
+                    base, fd, bk = self.get_unsortedbin(arena)
+                    fwd = self.get_chunk(fd)
+
+                    if fwd.bk != base:
+                        errors.append("Corrupted unsorted chunks. fwd->bk (0x%x) != bck (0x%x)" % \
+                            (fwd.bk, base))
+
+        except Exception as e:
+            errors.append("Exception during parsing: " + str(e.message))
+            warning(traceback.format_exc())
+
+        if len(errors) == 0:
+            return (True, errors)
+
+        return (False, errors)
+
+
+    def merge_info(self, chunk_addr, arena=None):
+        try:
+            av = self.get_arena(arena)
+            chunk = self.get_chunk(chunk_addr)
+            prev_size = chunk.prev_size
+            size = chunk.norm_size
+
+            next_addr = chunk_addr + chunk.norm_size
+            next_chunk = self.get_chunk(next_addr)
+            next_size  = next_chunk.norm_size
+
+            if next_chunk.prev_inuse == 0:
+                return ("The chunk is freed")
+
+            fastbins = self.get_all_fastbins_chunks(arena)
+            if chunk_addr in fastbins:
+                return ("The chunk is already in fastbins")
+
+            if self.tcache_enabled:
+                tcache_entries = self.get_all_tcache_chunks(arena)
+                if chunk_addr in tcache_entries:
+                    return ("The chunk is already in tcache")
+
+                tcache = self.get_tcache_struct(arena)
+                tc_idx = self.csize2tidx(size)
+
+                if tc_idx < TCACHE_BINS and tcache.counts[tc_idx] < TCACHE_COUNT:
+                    return ("The chunk will be part of tcache.entries[%d]" % tc_idx)
+
+            if size <= self.ptr_size * 16:
+                fast_id = self.fastbin_index(size)
+                return ("The chunk will be part of fastbins[%d]" % fast_id)
+
+            else:
+                if next_addr != av.top:
+                    next_next = self.get_chunk(next_addr)
+                    next_inuse = next_next.prev_inuse
+
+                # prev chunk is freed
+                if chunk.prev_inuse == 0:
+
+                    prev_chunk_addr = self.prev_chunk(chunk_addr)
+                    if next_addr == av.top:
+                        # show unlink info por prev_chunk
+                        return ("The chunk will merge into top, top will be: %#x" %  \
+                             prev_chunk_addr)
+
+                    # next chunk is freed
+                    elif next_inuse == 0:
+                        res = []
+                        res.append("The chunk and %#x will merge into %#x" % \
+                            (next_addr, prev_chunk_addr))
+
+                        unlink_prev = self.unlinkable(self.prev_chunk_addr)
+                        unlink_next = self.unlinkable(self.next_addr)
+                        res.append("Unlinkable (%#x): %s" % (prev_chunk_addr, str(unlink_prev)))
+                        res.append("Unlinkable (%#x): %s" % (next_addr, str(unlink_next)))
+                        return res
+
+                    else:
+                        res = []
+                        res.append("The chunk will merge into prev_chunk (%#x)" % \
+                            (prev_chunk_addr))
+
+                        unlinkable = self.unlinkable(prev_chunk_addr)
+                        res.append("Unlinkable(%#x): %s" % (prev_chunk_addr, str(unlinkable)))
+                        return res
+
+                # prev chunk in use
+                else:
+                    if next_addr == av.top:
+                        return ("The chunk will merge into top. Top will be: %#x" % \
+                            chunk_addr)
+
+                    # if next chunk is freed
+                    elif next_inuse == 0:
+                        res = []
+                        res.append("The chunk will merge with next chunk (%#x)" % \
+                            next_addr)
+
+                        unlinkable = self.unlinkable(next_addr)
+                        res.append("Unlinkable (%#x): %s" % (next_addr, str(unlinkable)))
+                        return res
+
+                    else:
+                        return ("The chunk will not merge with other (unsortedbin)")
+
+        except Exception as e:
+            warning(traceback.format_exc())
+
+        return None
 

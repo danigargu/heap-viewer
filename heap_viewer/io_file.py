@@ -12,6 +12,8 @@ import collections
 from ctypes import *
 from heap_viewer.misc import *
 
+import heap_viewer.config as config
+
 #-----------------------------------------------------------------------
 # struct _IO_FILE 32 bits
 
@@ -180,7 +182,7 @@ def parse_io_file_structs(address):
     io_jump_s = None
     io_file_plus_s = None
 
-    ptr_size = get_arch_ptrsize()
+    ptr_size = config.ptr_size
     structs = io_file_structs.get(ptr_size)
     if structs is None:
         return None
