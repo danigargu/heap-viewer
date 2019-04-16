@@ -207,7 +207,7 @@ def get_func_name_offset(ea):
     if func:
         offset = ea - func.startEA
         return "%s+%#x" % (GetFunctionName(ea), offset)
-    return None
+    return "%#x" % ea
 
 # --------------------------------------------------------------------------
 def addr_by_name_expr(name):
@@ -230,26 +230,6 @@ def parse_name_expr(name):
                 return (values[0], eval(values[1]))
             return (values[0], 0)
     return None
-
-# --------------------------------------------------------------------------
-def make_html_chain(name, chain, b_error):
-    empty_bin = '<span style="color: red; font-weight: bold">Empty</span>'
-    res_html = '<style>p{font-family:Consoles;font-size:13px}</style>'
-    res_html += '<p><b>%s</b>: ' % name
-
-    if not len(chain):
-        res_html += empty_bin
-    else:
-        for i in range(len(chain)):
-            res_html += "0x%x" % chain[i]
-            if i != len(chain)-1:
-                if i == len(chain)-2:
-                    res_html += ' ← '.decode("utf-8")
-                else:
-                    res_html += ' → '.decode("utf-8")
-        res_html += '</p>'
-    
-    return res_html
 
 # --------------------------------------------------------------------------
 def is_process_suspended():
@@ -323,6 +303,41 @@ def check_overlap(addr, size, chunk_list):
             ((addr < start) and  ((addr + size) >= end)):
             return start
     return None
+
+# --------------------------------------------------------------------------
+def jumpto_expr(expr):
+    ea = idaapi.str2ea(expr)
+    if ea == BADADDR:
+        return False
+    return idaapi.jumpto(ea)
+
+# --------------------------------------------------------------------------
+def get_module(ea):
+    try:
+        m_info = idaapi.modinfo_t()
+        rc = get_module_info(ea, m_info)
+        if rc:
+            return m_info
+    except AttributeError:
+        # < IDA 7.2
+        for m_info in Modules():
+            end = m_info.base + m_info.size
+            if m_info.base <= ea < end:
+                return m_info
+    return None
+
+# --------------------------------------------------------------------------
+def get_program_module():
+    #rc = idaapi.get_first_module(m_info)
+    entry_point = StartEA()
+    if entry_point == BADADDR:
+        return None
+
+    m_info = get_module(entry_point)
+    if m_info is None:
+        return None
+
+    return m_info
 
 # --------------------------------------------------------------------------
 

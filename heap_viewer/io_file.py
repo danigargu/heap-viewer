@@ -177,7 +177,7 @@ io_file_structs = {
 }
 
 #-----------------------------------------------------------------------
-def parse_io_file_structs(address):
+def parse_structs(address):
     io_file_s = None
     io_jump_s = None
     io_file_plus_s = None

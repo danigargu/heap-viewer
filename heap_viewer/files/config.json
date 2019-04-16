@@ -2,6 +2,7 @@
     "stop_during_tracing": true, 
     "detect_double_frees_and_overlaps": true, 
     "start_tracing_at_startup": true,
+    "filter_library_calls": false,
     "hexdump_limit": 1024, 
     "libc_offsets": {}
 }

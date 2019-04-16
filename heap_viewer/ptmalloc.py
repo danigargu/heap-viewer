@@ -4,9 +4,10 @@
 # HeapViewer - by @danigargu
 #
 
-from idc import *
-from idautils import *
-from idaapi import *
+import traceback
+
+import idc
+import idaapi
 
 from ctypes import *
 from collections import OrderedDict
@@ -427,13 +428,13 @@ class Heap(object):
         return self.generic_chain(address, 0, 0, add_stop) # offset 0: next
 
     def get_struct(self, address, struct_type):
-        assert is_loaded(address) == True, "Can't access memory at 0x%x" % address
-        sbytes = get_bytes(address, sizeof(struct_type))
+        assert idaapi.is_loaded(address) == True, "Can't access memory at 0x%x" % address
+        sbytes = idaapi.get_bytes(address, sizeof(struct_type))
         return struct_type.from_buffer_copy(sbytes)
 
     def get_heap_base(self, address=None):
         if not address:
-            segm = get_segm_by_name("[heap]") # same as mp_->sbrk_base
+            segm = idaapi.get_segm_by_name("[heap]") # same as mp_->sbrk_base
             if segm:
                 return segm.startEA
         else:
@@ -534,7 +535,7 @@ class Heap(object):
 
         while next_ptr not in (main_arena_addr, 0):
 
-            if not is_loaded(next_ptr):
+            if not idaapi.is_loaded(next_ptr):
                 break
 
             arena = self.get_arena(next_ptr)
@@ -558,7 +559,7 @@ class Heap(object):
         if not heap_base:
             return results
 
-        heap_size = SegEnd(heap_base) - heap_base
+        heap_size = idc.SegEnd(heap_base) - heap_base
 
         '''
         For prevent incorrect parsing in glibc > 2.25 (i386)
@@ -694,7 +695,6 @@ class Heap(object):
             return False
         if chunk.norm_size != next_chunk.prev_size:
             return False
-
         return True
 
     def find_fakefast(self, target_addr):

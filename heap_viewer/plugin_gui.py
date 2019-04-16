@@ -4,30 +4,25 @@
 # HeapViewer - by @danigargu
 #
 
+import os
+import idaapi
 import traceback
 
-from idc import *
-from idautils import *
-from idaapi import *
-
 from PyQt5 import QtGui, QtCore, QtWidgets
-from PyQt5.QtWidgets import QWidget, QSplitter, QTabWidget, QPushButton, QComboBox
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel
+from PyQt5.QtCore import Qt
 
-from heap_viewer.misc import *
-from heap_viewer.ui_widgets import *
+from heap_viewer.widgets import *
 from heap_viewer.ptmalloc import Heap
-from heap_viewer import CONFIG_PATH, ICONS_DIR, PLUGNAME
+from heap_viewer import ICONS_DIR, PLUGNAME
 
 import heap_viewer.config as config
+import heap_viewer.misc as misc
 
 # -----------------------------------------------------------------------
-class HeapPluginForm(PluginForm):
+class HeapPluginForm(idaapi.PluginForm):
     def __init__(self):
         super(HeapPluginForm, self).__init__()
         self.parent      = None
-        self.config_path = None
-        self.config      = None
         self.tracer      = None
         self.heap        = None
         self.cur_arena   = None
@@ -48,7 +43,7 @@ class HeapPluginForm(PluginForm):
         self.magic_widget = MagicWidget(self)
         self.config_widget = ConfigWidget(self)
 
-        self.tabs = QTabWidget()
+        self.tabs = QtWidgets.QTabWidget()
         self.tabs.addTab(self.tracer_tab, "Tracer")
         self.tabs.addTab(self.arena_widget, "Arena")
         self.tabs.addTab(self.bins_widget, "Bins")
@@ -56,51 +51,51 @@ class HeapPluginForm(PluginForm):
         self.tabs.addTab(self.magic_widget, "Magic")
         self.tabs.addTab(self.config_widget, "Config")
 
-        self.btn_reload = QPushButton("Reload info")
+        self.btn_reload = QtWidgets.QPushButton("Reload")
         icon = QtGui.QIcon(os.path.normpath(ICONS_DIR + '/refresh.png'))
         self.btn_reload.setIcon(icon)
         self.btn_reload.setFixedWidth(120)
         self.btn_reload.setEnabled(False)
         self.btn_reload.clicked.connect(self.reload_gui_info)
 
-        self.cb_arenas = QComboBox()
+        self.cb_arenas = QtWidgets.QComboBox()
         self.cb_arenas.setFixedWidth(150)
         self.cb_arenas.currentIndexChanged[int].connect(self.cb_arenas_changed)
 
-        hbox_arenas = QHBoxLayout()        
-        hbox_arenas.addWidget(QLabel('Switch arena: '))
+        hbox_arenas = QtWidgets.QHBoxLayout()        
+        hbox_arenas.addWidget(QtWidgets.QLabel("Switch arena: "))
         hbox_arenas.addWidget(self.cb_arenas)
         hbox_arenas.setContentsMargins(0, 0, 0, 0)
 
-        self.arenas_widget = QWidget()
+        self.arenas_widget = QtWidgets.QWidget()
         self.arenas_widget.setLayout(hbox_arenas)
         self.arenas_widget.setVisible(False)
 
-        self.txt_warning = QLabel()
+        self.txt_warning = QtWidgets.QLabel()
         self.txt_warning.setStyleSheet("font-weight: bold; color: red")
         self.txt_warning.setVisible(False)
 
-        hbox_top = QHBoxLayout()
+        hbox_top = QtWidgets.QHBoxLayout()
         hbox_top.addWidget(self.btn_reload)
         hbox_top.addWidget(self.arenas_widget)
         hbox_top.addWidget(self.txt_warning)
         hbox_top.setContentsMargins(0, 0, 0, 0)
         hbox_top.addStretch(1)
 
-        vbox_left_panel = QVBoxLayout()        
+        vbox_left_panel = QtWidgets.QVBoxLayout()
         vbox_left_panel.addLayout(hbox_top)
         vbox_left_panel.addWidget(self.tabs)
         vbox_left_panel.setContentsMargins(0, 0, 0, 0)
 
-        left_panel = QWidget()
+        left_panel = QtWidgets.QWidget()
         left_panel.setLayout(vbox_left_panel)
 
-        self.splitter = QSplitter(QtCore.Qt.Horizontal)
+        self.splitter = QtWidgets.QSplitter(Qt.Horizontal)
         self.splitter.addWidget(left_panel)
         self.splitter.addWidget(self.chunk_widget)
         self.splitter.setStretchFactor(0, 1)
 
-        main_layout = QVBoxLayout()
+        main_layout = QtWidgets.QVBoxLayout()
         main_layout.addWidget(self.splitter)
         self.parent.setLayout(main_layout)
 
@@ -112,20 +107,21 @@ class HeapPluginForm(PluginForm):
         if self.heap is None:
             return
 
-        if not is_process_suspended():
-            answer = askyn_c(
-                ASKBTN_YES, 
-                "HIDECANCEL\nThe process must be suspended to reload the info.\n\
-                Do you want to suspend it?")
-
-            if answer == ASKBTN_NO:
-                return
-
-            if not suspend_process():
-                warning("Unable to suspend the process")
-                return
         try:
-            RefreshDebuggerMemory()
+            if not misc.is_process_suspended():
+                answer = idaapi.askyn_c(
+                    idaapi.ASKBTN_YES, 
+                    "HIDECANCEL\nThe process must be suspended to reload the info.\n\
+                    Do you want to suspend it?")
+
+                if answer == idaapi.ASKBTN_NO:
+                    return
+
+                if not idaapi.suspend_process():
+                    warning("Unable to suspend the process")
+                    return
+        
+            idaapi.refresh_debugger_memory()
             if not self.heap.get_heap_base():
                 self.show_warning("Heap not initialized")
                 return
@@ -159,8 +155,6 @@ class HeapPluginForm(PluginForm):
             self.show_warning("Please, fix the config file")
             warning(str(e))
             return
-
-         
 
     def populate_arenas(self):
         old_arena = self.cur_arena
@@ -199,15 +193,15 @@ class HeapPluginForm(PluginForm):
         self.magic_widget.freeable_widget.check_freeable()
 
     def Show(self):
-        return PluginForm.Show(self, PLUGNAME, options = (
-            PluginForm.FORM_TAB | PluginForm.FORM_CLOSE_LATER
+        return idaapi.PluginForm.Show(self, PLUGNAME, options = (
+            idaapi.PluginForm.FORM_TAB | idaapi.PluginForm.FORM_CLOSE_LATER
         ))
     
     def OnClose(self, form):
         if self.tracer:
             self.tracer.unhook()
-            log("Tracer disabled")
-        log("Form closed")
+            misc.log("Tracer disabled")
+        misc.log("Form closed")
 
 # --------------------------------------------------------------------------
 

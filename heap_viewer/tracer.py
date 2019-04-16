@@ -82,6 +82,11 @@ class HeapTracer(DBG_Hooks):
         ret_addr = self.get_return_address()
         thread_id = get_current_thread()
 
+        if config.filter_library_calls:
+            m_info = get_module(ret_addr)
+            if m_info and m_info.name != config.program_module.name:
+                return 0
+
         if func_name == 'malloc':
             req_size = self.get_arg(0)
             args = req_size

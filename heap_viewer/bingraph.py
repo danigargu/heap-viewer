@@ -7,17 +7,15 @@
 import idc
 import idaapi
 
-from idaapi import GraphViewer
-
 # --------------------------------------------------------------------------
-class BinGraph(GraphViewer):
+class BinGraph(idaapi.GraphViewer):
     def __init__(self, parent, info, close_open=True):   
         self.cur_arena  = parent.cur_arena
         self.heap       = parent.heap
         self.info       = info
         self.bin_type   = info['type']
         self.SetCurrentRendererType(idaapi.TCCRT_GRAPH)
-        GraphViewer.__init__(self, self.title, close_open)
+        idaapi.GraphViewer.__init__(self, self.title, close_open)
 
     @property
     def graph_func(self):
@@ -48,8 +46,8 @@ class BinGraph(GraphViewer):
     def chunk_info(self, chunk_addr, chunk):
         line =  idaapi.COLSTR("Chunk ", idaapi.SCOLOR_NUMBER)
         line += idaapi.COLSTR("0x%x\n\n" % (chunk_addr), idaapi.SCOLOR_INSN)
-        line += idaapi.COLSTR("size: 0x%x\nfd: 0x%x - %s" % 
-                (chunk.size, chunk.fd, SegName(chunk.fd), ), SCOLOR_DEFAULT)
+        line += idaapi.COLSTR("size: 0x%x\nfd: 0x%x - %s" % \
+                (chunk.size, chunk.fd, idc.SegName(chunk.fd)), SCOLOR_DEFAULT)
         return line
 
     def tcache_info(self, entry_addr, chunk_addr):        
@@ -67,10 +65,10 @@ class BinGraph(GraphViewer):
         if with_size:
             chunk_info += "size: 0x%x\n" % chunk.size
 
-        chunk_info += "fd: 0x%x - %s\nbk: 0x%x - %s" % (chunk.fd, SegName(chunk.fd), 
-            chunk.bk, SegName(chunk.bk))
+        chunk_info += "fd: 0x%x - %s\nbk: 0x%x - %s" % (chunk.fd, \
+            idc.SegName(chunk.fd), chunk.bk, idc.SegName(chunk.bk))
 
-        line += idaapi.COLSTR(chunk_info, SCOLOR_DEFAULT)
+        line += idaapi.COLSTR(chunk_info, idaapi.SCOLOR_DEFAULT)
         return line
 
     def add_error_edge(self, id_node):
@@ -176,9 +174,8 @@ class BinGraph(GraphViewer):
             self.add_error_edge(prev_chunk)
         else:
             self.AddEdge(prev_chunk, id_node[bin_base])
-
+            
         return True
-
 
     def OnRefresh(self):
         self.Clear()
@@ -206,7 +203,7 @@ class BinGraph(GraphViewer):
             idaapi.refresh_idaview_anyway()
 
     def Show(self):
-        if not GraphViewer.Show(self):
+        if not idaapi.GraphViewer.Show(self):
             return False
 
         self.cmd_refresh = self.AddCommand("Refresh", "Ctrl+R")
