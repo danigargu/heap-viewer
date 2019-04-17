@@ -10,7 +10,7 @@ from idautils import *
 from ctypes import *
 
 from heap_viewer.misc import *
-import heap_viewer.config as config
+from heap_viewer import config
 
 # -----------------------------------------------------------------------
 class HeapTracer(DBG_Hooks):

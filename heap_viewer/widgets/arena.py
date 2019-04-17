@@ -9,7 +9,9 @@ import idc
 from PyQt5 import QtGui, QtCore, QtWidgets
 
 from heap_viewer.widgets.custom import CustomWidget, TTable
-import heap_viewer.config as config
+from heap_viewer.misc import *
+from heap_viewer import config
+from heap_viewer import ptmalloc
 
 # -----------------------------------------------------------------------
 class ArenaWidget(CustomWidget):
@@ -43,6 +45,11 @@ class ArenaWidget(CustomWidget):
         hbox_arena_top.addWidget(self.t_top_addr)
         hbox_arena_top.addWidget(QtWidgets.QLabel('Last remainder:'))
         hbox_arena_top.addWidget(self.t_last_remainder)
+
+        #btn_malloc_par = QtWidgets.QPushButton("malloc_par")
+        #btn_malloc_par.clicked.connect(self.btn_malloc_par_on_click)
+        #hbox_arena_top.addWidget(btn_malloc_par)
+
         hbox_arena_top.addWidget(QtWidgets.QLabel('Attached threads:'))
         hbox_arena_top.addWidget(self.t_attached_threads)
         hbox_arena_top.addStretch(1)
@@ -153,6 +160,18 @@ class ArenaWidget(CustomWidget):
         self.tbl_parsed_heap.resizeColumnsToContents()
         self.tbl_parsed_heap.setSortingEnabled(True)
         self.tbl_parsed_heap.sortByColumn(0, QtCore.Qt.DescendingOrder)
+
+    def btn_malloc_par_on_click(self):
+        mp_ = find_malloc_par()
+        if mp_ is None:
+            idaapi.warning("Unable to resolve 'mp_' address. Try again with initialized heap")
+            return
+
+        idaapi.info("malloc_par: %#x" % mp_)
+        malloc_par_struct = ptmalloc.parse_malloc_par(mp_)
+        for name, ctype in malloc_par_struct._fields_:
+            value = getattr(malloc_par_struct, name)
+            print("%s - %#x" % (name, value))
 
 
 # -----------------------------------------------------------------------

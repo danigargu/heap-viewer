@@ -10,7 +10,7 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 
 from heap_viewer.widgets.custom import CustomWidget, TTable
 from heap_viewer.bingraph import BinGraph
-import heap_viewer.config as config
+from heap_viewer import config
 
 # -----------------------------------------------------------------------
 class BinsWidget(CustomWidget):

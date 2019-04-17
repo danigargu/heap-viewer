@@ -10,15 +10,14 @@ import traceback
 import idc
 import idaapi
 
-from ctypes import *
-
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
-from heap_viewer.widgets.custom import CustomWidget, TTable
-from heap_viewer.ptmalloc import *
+from ctypes import *
 
-import heap_viewer.config as config
+from heap_viewer.widgets.custom import CustomWidget
+from heap_viewer.ptmalloc import *
+from heap_viewer import config
 
 # -----------------------------------------------------------------------
 class ChunkEditor(QtWidgets.QDialog):

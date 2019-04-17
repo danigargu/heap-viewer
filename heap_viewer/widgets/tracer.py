@@ -16,9 +16,8 @@ from heap_viewer.tracer import HeapTracer
 from heap_viewer.widgets.custom import CustomWidget, TTable
 from heap_viewer.misc import *
 from heap_viewer.ptmalloc import *
-
-import heap_viewer.config as config
-import heap_viewer.villoc as villoc
+from heap_viewer import config
+from heap_viewer import villoc
 
 # -----------------------------------------------------------------------
 class TracerWidget(CustomWidget):

@@ -21,6 +21,12 @@ def log(msg):
     idaapi.msg("[%s] %s\n" % (PLUGNAME, msg))
 
 # --------------------------------------------------------------------------
+def get_struct(address, struct_type):
+    assert idaapi.is_loaded(address) == True, "Can't access memory at 0x%x" % address
+    sbytes = idaapi.get_bytes(address, sizeof(struct_type))
+    return struct_type.from_buffer_copy(sbytes)
+
+# --------------------------------------------------------------------------   
 def round_up(offset, alignment):
     return (offset + alignment - 1) & -alignment
 

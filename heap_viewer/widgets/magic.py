@@ -14,9 +14,8 @@ from cgi import escape as html_encode
 
 from heap_viewer.misc import *
 from heap_viewer.widgets.custom import CustomWidget, TTable
-
-import heap_viewer.io_file as io_file
-import heap_viewer.config as config
+from heap_viewer import io_file
+from heap_viewer import config
 
 # -----------------------------------------------------------------------
 class MagicWidget(CustomWidget):
@@ -485,7 +484,7 @@ class FakefastWidget(CustomWidget):
         fake_chunks = self.heap.find_fakefast(start_addr)
 
         if len(fake_chunks) == 0:
-            idaapi.info("Fakefast: No results")
+            idaapi.info("Fakefast: 0 results")
             return
 
         self.tbl_fakefast.clearContents()

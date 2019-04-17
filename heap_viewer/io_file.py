@@ -11,8 +11,7 @@ import collections
 
 from ctypes import *
 from heap_viewer.misc import *
-
-import heap_viewer.config as config
+from heap_viewer import config
 
 #-----------------------------------------------------------------------
 # struct _IO_FILE 32 bits

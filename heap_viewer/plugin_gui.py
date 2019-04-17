@@ -14,9 +14,8 @@ from PyQt5.QtCore import Qt
 from heap_viewer.widgets import *
 from heap_viewer.ptmalloc import Heap
 from heap_viewer import ICONS_DIR, PLUGNAME
-
-import heap_viewer.config as config
-import heap_viewer.misc as misc
+from heap_viewer import config
+from heap_viewer import misc
 
 # -----------------------------------------------------------------------
 class HeapPluginForm(idaapi.PluginForm):

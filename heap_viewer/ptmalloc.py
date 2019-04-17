@@ -13,7 +13,7 @@ from ctypes import *
 from collections import OrderedDict
 
 from heap_viewer.misc import *
-import heap_viewer.config as config
+from heap_viewer import config
 
 #-----------------------------------------------------------------------
 # Some glibc heap constants
@@ -42,10 +42,49 @@ TCACHE_COUNT = 7
 
 DL_PAGESIZE = 4096
 
-
 #-----------------------------------------------------------------------
 # struct malloc_par
 
+def malloc_par():
+    uint = {
+        4: c_uint32, 
+        8: c_uint64
+    }[config.ptr_size]
+
+    fields = [
+        ("trim_threshold",   uint),
+        ("top_pad",          uint),
+        ("mmap_threshold",   uint),
+        ("arena_test",       uint),
+        ("arena_max",        uint),
+        ("n_mmaps",          c_int),
+        ("n_mmaps_max",      c_int),
+        ("max_n_mmaps",      c_int),
+        ("no_dyn_threshold", c_int),
+        ("mmapped_mem",      uint),
+        ("max_mmapped_mem",  uint),
+        ("max_total_mem",    uint)
+    ]
+    if config.libc_version >= "2.24":
+        fields.pop() # max_total_mem was removed in glibc 2.24
+
+    fields.extend([("sbrk_base", uint)])
+
+    if config.libc_version >= "2.26":
+        fields.extend([
+            ("tcache_bins",           uint),
+            ("tcache_max_bytes",      uint),
+            ("tcache_count",          uint),
+            ("tcache_unsorted_limit", uint),
+        ])
+
+    class malloc_par_struct(LittleEndianStructure):
+        _pack_ = config.ptr_size
+        _fields_ = fields
+
+    return malloc_par_struct
+
+"""
 class malloc_par(LittleEndianStructure):
     def __str__(self):
         pass
@@ -91,6 +130,7 @@ class malloc_par_64(malloc_par):
         ("tcache_count",          c_uint64),
         ("tcache_unsorted_limit", c_uint64)
     ]
+"""
 
 #-----------------------------------------------------------------------
 # struct malloc_state (Arenas)
@@ -455,7 +495,7 @@ class Heap(object):
     def get_tcache_struct(self, arena=None):
         tcache_address = self.get_tcache_address(arena)
         if tcache_address:
-            return self.get_struct(tcache_address, self.tcache_perthread_s)
+            return get_struct(tcache_address, self.tcache_perthread_s)
         return None
 
     def get_tcache(self, arena=None):    
@@ -506,7 +546,7 @@ class Heap(object):
     def get_arena(self, address=None):
         if not address:
             address = self.main_arena_addr
-        return self.get_struct(address, self.malloc_state_s)
+        return get_struct(address, self.malloc_state_s)
 
     def get_arena_for_chunk(self, addr):
         pass # TODO
@@ -515,7 +555,7 @@ class Heap(object):
         return self.get_ptr(self.global_max_fast_addr)
 
     def get_chunk(self, address):
-        return self.get_struct(address, self.malloc_chunk_s)
+        return get_struct(address, self.malloc_chunk_s)
 
     def prev_chunk(self, address):
         chunk = self.get_chunk(address)
@@ -925,3 +965,6 @@ class Heap(object):
 
         return None
 
+
+def parse_malloc_par(address):
+    return get_struct(address, malloc_par())

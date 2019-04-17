@@ -10,8 +10,8 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
 from heap_viewer.widgets.custom import CustomWidget, TTable
-import heap_viewer.config as config
-import heap_viewer.misc as misc
+from heap_viewer import config
+from heap_viewer import misc
 
 # -----------------------------------------------------------------------
 class ConfigWidget(CustomWidget):
