@@ -90,7 +90,7 @@ class CustomWidget(QtWidgets.QWidget):
 # -----------------------------------------------------------------------
 class InfoDialog(QtWidgets.QDialog):
     def __init__(self, info, parent=None):
-        super(InfoDialog, self).__init__()
+        super(InfoDialog, self).__init__(parent)
         self.parent = parent
         self.info = info
         self._create_gui()
@@ -107,5 +107,7 @@ class InfoDialog(QtWidgets.QDialog):
         hbox.addWidget(self.t_info)
         self.setLayout(hbox)
 
-# -----------------------------------------------------------------------
+
+
+
 

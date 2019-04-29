@@ -53,7 +53,7 @@ class HeapTracer(DBG_Hooks):
         for name in funcs:
             addr = LocByName("__libc_%s" % name)
             if addr == BADADDR:
-                warning("Unable to resolve '%s' address" % k)
+                warning("Unable to resolve '%s' address" % name)
                 continue
             self.hooked_funcs[addr] = name
 

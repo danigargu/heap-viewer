@@ -24,7 +24,9 @@ def log(msg):
 def get_struct(address, struct_type):
     assert idaapi.is_loaded(address) == True, "Can't access memory at 0x%x" % address
     sbytes = idaapi.get_bytes(address, sizeof(struct_type))
-    return struct_type.from_buffer_copy(sbytes)
+    struct = struct_type.from_buffer_copy(sbytes)
+    struct._addr = address
+    return struct
 
 # --------------------------------------------------------------------------   
 def round_up(offset, alignment):
@@ -57,12 +59,6 @@ def offset_of(struct_type, member):
             break
         offset += sizeof(ctype)
     return result
-
-# --------------------------------------------------------------------------
-def parse_struct(address, struct_type):
-    buff = idaapi.get_bytes(address, sizeof(struct_type))
-    assert len(buff) == sizeof(struct_type)
-    return struct_type.from_buffer_copy(buff)
 
 # --------------------------------------------------------------------------
 def get_libc_version_appcall():
@@ -153,6 +149,10 @@ def get_arch_ptrsize():
     return ptr_size
 
 # --------------------------------------------------------------------------
+def get_proc_name():
+    return GetLongPrm(INF_PROCNAME).lower()
+
+# --------------------------------------------------------------------------
 def get_main_arena_address_x64():
     main_arena = None
     malloc_addr = LocByName("__libc_malloc")
@@ -240,64 +240,6 @@ def parse_name_expr(name):
 # --------------------------------------------------------------------------
 def is_process_suspended():
     return (idaapi.get_process_state() == DSTATE_SUSP)
-
-# --------------------------------------------------------------------------
-def find_main_arena():
-    main_arena = LocByName("main_arena") # from libc6-dbg
-    if main_arena != BADADDR:
-        return main_arena
-
-    ptr_size = get_arch_ptrsize()
-    ea = SegStart(LocByName("_IO_2_1_stdin_"))
-    end_ea = SegEnd(ea)
-
-    # &main_arena->next
-    offsets = {
-        4: [1088, 1096], # 32 bits
-        8: [2152, 2160]  # 64 bits
-    }
-
-    if ea == BADADDR or end_ea == BADADDR:
-        return None
-
-    get_ptr = Dword if ptr_size == 4 else Qword
-    while ea < end_ea:
-        ptr = get_ptr(ea) # ptr to main_arena
-        if is_loaded(ptr) and ptr < ea and get_ptr(ptr)==0: # flags=0x0
-            if (ea-ptr) in offsets[ptr_size]:
-                return ptr
-        ea += ptr_size
-    return None
-
-# --------------------------------------------------------------------------
-def find_malloc_par():
-    mp_ = LocByName("mp_")
-    if mp_ != BADADDR:
-        return mp_
-
-    ptr_size = get_arch_ptrsize()
-    get_ptr = Dword if ptr_size == 4 else Qword
-
-    segm = get_segm_by_name("[heap]")
-    if segm is None:
-        return None
-
-    offset = {
-        4: 48,
-        8: 72
-    }[ptr_size]
-    sbrk_base = segm.startEA
-
-    ea = SegStart(LocByName("_IO_2_1_stdin_"))
-    end_ea = SegEnd(ea)
-
-    while ea < end_ea:
-        ptr = get_ptr(ea)
-        if is_loaded(ptr) and ptr == sbrk_base:
-            return (ea-offset)
-        ea += ptr_size
-
-    return None
 
 # --------------------------------------------------------------------------
 def check_overlap(addr, size, chunk_list):

@@ -43,39 +43,44 @@ TCACHE_COUNT = 7
 DL_PAGESIZE = 4096
 
 #-----------------------------------------------------------------------
+# Heap types
+
+heap_types = {
+    4: [c_int, c_uint32],
+    8: [c_int, c_uint64]
+} 
+
+#-----------------------------------------------------------------------
 # struct malloc_par
 
 def malloc_par():
-    uint = {
-        4: c_uint32, 
-        8: c_uint64
-    }[config.ptr_size]
+    t_int, t_uint = heap_types.get(config.ptr_size)
 
     fields = [
-        ("trim_threshold",   uint),
-        ("top_pad",          uint),
-        ("mmap_threshold",   uint),
-        ("arena_test",       uint),
-        ("arena_max",        uint),
-        ("n_mmaps",          c_int),
-        ("n_mmaps_max",      c_int),
-        ("max_n_mmaps",      c_int),
-        ("no_dyn_threshold", c_int),
-        ("mmapped_mem",      uint),
-        ("max_mmapped_mem",  uint),
-        ("max_total_mem",    uint)
+        ("trim_threshold",   t_uint),
+        ("top_pad",          t_uint),
+        ("mmap_threshold",   t_uint),
+        ("arena_test",       t_uint),
+        ("arena_max",        t_uint),
+        ("n_mmaps",          t_int),
+        ("n_mmaps_max",      t_int),
+        ("max_n_mmaps",      t_int),
+        ("no_dyn_threshold", t_int),
+        ("mmapped_mem",      t_uint),
+        ("max_mmapped_mem",  t_uint),
+        ("max_total_mem",    t_uint)
     ]
     if config.libc_version >= "2.24":
         fields.pop() # max_total_mem was removed in glibc 2.24
 
-    fields.extend([("sbrk_base", uint)])
+    fields.extend([("sbrk_base", t_uint)])
 
     if config.libc_version >= "2.26":
         fields.extend([
-            ("tcache_bins",           uint),
-            ("tcache_max_bytes",      uint),
-            ("tcache_count",          uint),
-            ("tcache_unsorted_limit", uint),
+            ("tcache_bins",           t_uint),
+            ("tcache_max_bytes",      t_uint),
+            ("tcache_count",          t_uint),
+            ("tcache_unsorted_limit", t_uint),
         ])
 
     class malloc_par_struct(LittleEndianStructure):
@@ -102,7 +107,7 @@ class malloc_par_32(malloc_par):
         ("no_dyn_threshold",      c_int),
         ("mmapped_mem",           c_uint32),
         ("max_mmapped_mem",       c_uint32),
-        #("max_total_mem",         c_uint32), # max_total_mem removed in glibc 2.24
+        #("max_total_mem",        c_uint32),
         ("sbrk_base",             c_uint32),
         ("tcache_bins",           c_uint32),
         ("tcache_max_bytes",      c_uint32),
@@ -135,9 +140,36 @@ class malloc_par_64(malloc_par):
 #-----------------------------------------------------------------------
 # struct malloc_state (Arenas)
 
-class malloc_state(LittleEndianStructure):
-    pass
+def malloc_state():
+    t_int, t_uint = heap_types.get(config.ptr_size)
 
+    fields = [
+        ("mutex",            t_int),
+        ("flags",            t_int),
+    ]
+    if config.libc_version >= "2.26":
+        fields.extend([("have_fastchunks", t_int)])
+
+    fields.extend([
+        ("fastbinsY",        t_uint * NFASTBINS),
+        ("top",              t_uint),
+        ("last_remainder",   t_uint),
+        ("bins",             t_uint * (NBINS * 2 - 2)),
+        ("binmap",           c_uint * BINMAPSIZE),
+        ("next",             t_uint),
+        ("next_free",        t_uint),
+        ("attached_threads", t_uint),
+        ("system_mem",       t_uint),
+        ("max_system_mem",   t_uint)
+    ])
+
+    class malloc_state_struct(LittleEndianStructure):
+        _pack_ = config.ptr_size
+        _fields_ = fields
+
+    return malloc_state_struct
+
+"""
 class malloc_state_32(malloc_state):
     _fields_ =  [
         ("mutex",            c_int),
@@ -204,12 +236,12 @@ class malloc_state_64_new(malloc_state):
         ("system_mem",       c_uint64),
         ("max_system_mem",   c_uint64)
     ]
-
+"""
 
 #-----------------------------------------------------------------------
 # struct malloc_chunk
 
-class malloc_chunk(LittleEndianStructure):
+class malloc_chunk_base(LittleEndianStructure):
     def __str__(self):
         return (
             "prev_size: 0x%x\n"
@@ -248,6 +280,27 @@ class malloc_chunk(LittleEndianStructure):
         return bool(self.size & NON_MAIN_ARENA)
 
 
+def malloc_chunk():
+    t_int, t_uint = heap_types.get(config.ptr_size)
+
+    class malloc_chunk_struct(malloc_chunk_base):
+        _pack_ = config.ptr_size
+        _fields_ = [
+            ("prev_size",   t_uint), # Size of previous chunk (if free).
+            ("size",        t_uint), # Size in bytes, including overhead.
+
+            ("fd",          t_uint), # double links -- used only if free.
+            ("bk",          t_uint),
+
+            # Only used for large blocks: pointer to next larger size.
+            ("fd_nextsize", t_uint),  # double links -- used only if free.
+            ("bk_nextsize", t_uint)
+        ]
+
+    return malloc_chunk_struct
+
+
+"""
 class malloc_chunk_64(malloc_chunk):
     _fields_ =  [
         ("prev_size",   c_uint64), # Size of previous chunk (if free).
@@ -273,11 +326,28 @@ class malloc_chunk_32(malloc_chunk):
         ("fd_nextsize", c_uint32),  # double links -- used only if free.
         ("bk_nextsize", c_uint32)
     ]
-
+"""
 
 #-----------------------------------------------------------------------
 # struct heap_info
 
+
+def heap_info():
+    t_int, t_uint = heap_types.get(config.ptr_size)
+
+    class heap_info_struct(LittleEndianStructure):
+        _pack_ = config.ptr_size
+        _fields_ = [
+            ("ar_ptr",        t_uint), # Arena for this heap.
+            ("prev",          t_uint), # Previous heap.
+            ("size",          t_uint), # Current size in bytes.
+            ("mprotect_size", t_uint), # Size in bytes that has been mprotected
+        ]
+
+    return heap_info_struct
+
+
+"""
 class heap_info_32(LittleEndianStructure):
     _fields_ =  [
         ("ar_ptr",        c_uint32), # Arena for this heap.
@@ -293,10 +363,24 @@ class heap_info_64(LittleEndianStructure):
         ("size",          c_uint64), # Current size in bytes.
         ("mprotect_size", c_uint64), # Size in bytes that has been mprotected
     ]
+"""
 
 # -----------------------------------------------------------------------
 # Tcache structs
 
+def tcache_perthread():
+    t_int, t_uint = heap_types.get(config.ptr_size)
+
+    class tcache_perthread_struct(LittleEndianStructure):
+        _pack_ = config.ptr_size
+        _fields_ = [
+            ("counts",  c_ubyte * TCACHE_BINS),
+            ("entries", t_uint * TCACHE_BINS),
+        ]
+
+    return tcache_perthread_struct
+
+"""
 class tcache_perthread_32(LittleEndianStructure): 
     _fields_ =  [
         ("counts",           c_ubyte * TCACHE_BINS),
@@ -308,7 +392,7 @@ class tcache_perthread_64(LittleEndianStructure):
         ("counts",           c_ubyte * TCACHE_BINS),
         ("entries",          c_uint64 * TCACHE_BINS),
     ]
-
+"""
 
 # -----------------------------------------------------------------------
 # ptmalloc2 allocator - Glibc Heap
@@ -329,29 +413,15 @@ class Heap(object):
     def initialize(self):
         self.ptr_size = config.ptr_size
         self.libc_base = config.libc_base
-        self.main_arena_addr = config.main_arena
         self.get_ptr = config.get_ptr
+        self.main_arena_addr = get_main_arena_addr()
 
-        if self.ptr_size == 4:
-            self.heap_info_s = heap_info_32
-            self.malloc_state_s = malloc_state_32
-            self.malloc_chunk_s = malloc_chunk_32
-            self.tcache_perthread_s = tcache_perthread_32
-            
-            if config.libc_version > "2.25":
-                self.tcache_enabled = True
-                self.malloc_state_s = malloc_state_32_new
-
-        elif self.ptr_size == 8:
-            self.heap_info_s = heap_info_64
-            self.malloc_state_s = malloc_state_64
-            self.malloc_chunk_s = malloc_chunk_64            
-            self.tcache_perthread_s = tcache_perthread_64
-            
-            if config.libc_version > "2.25":
-                self.tcache_enabled = True
-                self.malloc_state_s = malloc_state_64_new
-
+        # structs 
+        self.tcache_enabled = (config.libc_version > "2.25")
+        self.malloc_state_s = malloc_state()
+        self.heap_info_s = heap_info()
+        self.malloc_chunk_s = malloc_chunk()
+        self.tcache_perthread_s = tcache_perthread()
         self.chunk_offsets = get_struct_offsets(self.malloc_chunk_s)
         self.arena_offsets = get_struct_offsets(self.malloc_state_s)
 
@@ -965,6 +1035,70 @@ class Heap(object):
 
         return None
 
+# --------------------------------------------------------------------------
+def find_main_arena():
+    main_arena = idc.LocByName("main_arena") # from libc6-dbg
+    if main_arena != idc.BADADDR:
+        return main_arena
 
+    ea = idc.SegStart(idc.LocByName("_IO_2_1_stdin_"))
+    end_ea = idc.SegEnd(ea)
+
+    # &main_arena->next
+    offsets = {
+        4: [1088, 1096], # 32 bits
+        8: [2152, 2160]  # 64 bits
+    }
+
+    if ea == idc.BADADDR or end_ea == idc.BADADDR:
+        return None
+
+    get_ptr = config.get_ptr
+    while ea < end_ea:
+        ptr = get_ptr(ea) # ptr to main_arena
+        if idaapi.is_loaded(ptr) and ptr < ea and get_ptr(ptr) == 0: # flags=0x0
+            if (ea-ptr) in offsets[config.ptr_size]:
+                return ptr
+        ea += config.ptr_size
+    return None
+
+# --------------------------------------------------------------------------
+def find_malloc_par():
+    mp_ = idc.LocByName("mp_")
+    if mp_ != idc.BADADDR:
+        return mp_
+
+    segm = idaapi.get_segm_by_name("[heap]")
+    if segm is None:
+        return None
+
+    offset = get_struct_offsets(malloc_par()).get('sbrk_base')
+    sbrk_base = segm.startEA
+    ea = idc.SegStart(LocByName("_IO_2_1_stdin_"))
+    end_ea = idc.SegEnd(ea)
+
+    while ea < end_ea:
+        ptr = config.get_ptr(ea)
+        if idaapi.is_loaded(ptr) and ptr == sbrk_base:
+            return (ea-offset)
+        ea += config.ptr_size
+
+    return None
+
+# --------------------------------------------------------------------------
+def get_main_arena_addr():
+    if config.main_arena is not None:
+        return config.main_arena
+    return find_main_arena()
+
+# --------------------------------------------------------------------------
+def get_malloc_par_addr():
+    if config.malloc_par is not None:
+        return config.malloc_par
+    return find_malloc_par()
+
+# --------------------------------------------------------------------------
 def parse_malloc_par(address):
     return get_struct(address, malloc_par())
+
+# --------------------------------------------------------------------------

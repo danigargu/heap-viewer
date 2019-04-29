@@ -26,6 +26,7 @@ Currently supports the glibc malloc implementation (ptmalloc2).
 * Bins info (fastbins, unsortedbin, smallbins y largebins)
 * Tcache info (glibc >= 2.26)
 * GraphView for linked lists (bins/tcache)
+* Structs view (malloc_state / malloc_par / tcache_perthread)
 * Magic utils:
   * Unlink merge info
   * Freeable/merge info
@@ -47,6 +48,13 @@ To install just for the current user, copy the files into one of these directori
 | Linux/macOS | `~/.idapro/plugins`                  |
 | Windows     | `%AppData%\Hex-Rays\IDA Pro\plugins` |
 
+## Configuration
+
+Currently the plugin does not require to be configured, since it tries to obtain automatically the necessary offsets to analyze the heap. 
+
+However, in case the plugin fails, it is possible to set the different offsets in the configuration tab. To obtain these offsets, you can use any of the tools located in the `utils` folder.
+
+If you find any inconsistency, let me know :)
 
 ## Screenshots
 

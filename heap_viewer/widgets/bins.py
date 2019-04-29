@@ -527,7 +527,7 @@ def make_html_chain(name, chain, b_error):
         return res_html
 
     for i in range(chain_len):
-        res_html += "0x%x" % chain[i]
+        res_html += "%#x" % chain[i]
         if i != chain_len-1:
             if i == chain_len-2:
                 res_html += ' ← '.decode("utf-8")

@@ -22,7 +22,7 @@ from heap_viewer import config
 # -----------------------------------------------------------------------
 class ChunkEditor(QtWidgets.QDialog):
     def __init__(self, addr, parent=None):
-        super(ChunkEditor, self).__init__()
+        super(ChunkEditor, self).__init__(parent)
         self.addr = addr
         self.parent = parent
         self.chunk = None

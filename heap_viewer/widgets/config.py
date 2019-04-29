@@ -127,7 +127,7 @@ class ConfigWidget(CustomWidget):
             config.save()
             idaapi.info("Config updated")
 
-            self.parent.init_heap(from_update=True)
+            self.parent.init_heap()
             self.parent.reload_gui_info()
 
         except Exception as e:

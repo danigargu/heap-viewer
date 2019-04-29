@@ -7,8 +7,9 @@
 import idc
 
 from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5.QtCore import Qt
 
-from heap_viewer.widgets.custom import CustomWidget, TTable
+from heap_viewer.widgets.custom import CustomWidget, TTable, InfoDialog
 from heap_viewer.misc import *
 from heap_viewer import config
 from heap_viewer import ptmalloc
@@ -25,7 +26,7 @@ class ArenaWidget(CustomWidget):
 
     def _create_menu(self):
         self.t_top_addr = QtWidgets.QLineEdit()
-        self.t_top_addr.setFixedWidth(150)
+        self.t_top_addr.setFixedWidth(130)
         self.t_top_addr.setReadOnly(True)
 
         self.t_last_remainder = QtWidgets.QLineEdit()
@@ -37,7 +38,7 @@ class ArenaWidget(CustomWidget):
         self.lbl_top_warning.setVisible(False)
 
         self.t_attached_threads = QtWidgets.QLineEdit()
-        self.t_attached_threads.setFixedWidth(150)
+        self.t_attached_threads.setFixedWidth(130)
         self.t_attached_threads.setReadOnly(True)
 
         hbox_arena_top = QtWidgets.QHBoxLayout()
@@ -46,12 +47,10 @@ class ArenaWidget(CustomWidget):
         hbox_arena_top.addWidget(QtWidgets.QLabel('Last remainder:'))
         hbox_arena_top.addWidget(self.t_last_remainder)
 
-        #btn_malloc_par = QtWidgets.QPushButton("malloc_par")
-        #btn_malloc_par.clicked.connect(self.btn_malloc_par_on_click)
-        #hbox_arena_top.addWidget(btn_malloc_par)
+        btn_malloc_par = QtWidgets.QPushButton("Struct")
+        btn_malloc_par.clicked.connect(self.btn_struct_on_click)
+        hbox_arena_top.addWidget(btn_malloc_par)
 
-        hbox_arena_top.addWidget(QtWidgets.QLabel('Attached threads:'))
-        hbox_arena_top.addWidget(self.t_attached_threads)
         hbox_arena_top.addStretch(1)
 
         hbox_arena_others = QtWidgets.QHBoxLayout()
@@ -161,17 +160,8 @@ class ArenaWidget(CustomWidget):
         self.tbl_parsed_heap.setSortingEnabled(True)
         self.tbl_parsed_heap.sortByColumn(0, QtCore.Qt.DescendingOrder)
 
-    def btn_malloc_par_on_click(self):
-        mp_ = find_malloc_par()
-        if mp_ is None:
-            idaapi.warning("Unable to resolve 'mp_' address. Try again with initialized heap")
-            return
-
-        idaapi.info("malloc_par: %#x" % mp_)
-        malloc_par_struct = ptmalloc.parse_malloc_par(mp_)
-        for name, ctype in malloc_par_struct._fields_:
-            value = getattr(malloc_par_struct, name)
-            print("%s - %#x" % (name, value))
+    def btn_struct_on_click(self):
+        self.parent.show_malloc_state()
 
 
 # -----------------------------------------------------------------------

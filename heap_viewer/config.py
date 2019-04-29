@@ -61,14 +61,10 @@ def load():
         malloc_par = m.libc_offsets.get("mp_")
         global_max_fast = m.libc_offsets.get("global_max_fast")
 
-    if main_arena is None:
-        main_arena = find_main_arena()
-    else:
+    if main_arena is not None:
         main_arena += m.libc_base
 
-    if malloc_par is None:
-        malloc_par = find_malloc_par()
-    else:
+    if malloc_par is not None:
         malloc_par += m.libc_base
         
     m.main_arena = main_arena

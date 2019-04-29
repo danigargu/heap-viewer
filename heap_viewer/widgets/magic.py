@@ -631,8 +631,8 @@ class IOFileWidget(CustomWidget):
         except:
             idaapi.warning("ERROR: Invalid address")
 
-    def html_struct_table(self, struct):        
-        offsets = get_struct_offsets(type(struct))
+    def html_struct_table(self, struct):
+        offsets = get_struct_offsets(struct)
         struct_table = '<table>'
 
         for name, ctype in struct._fields_:

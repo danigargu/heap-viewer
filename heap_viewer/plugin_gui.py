@@ -41,12 +41,14 @@ class HeapPluginForm(idaapi.PluginForm):
         self.tcache_widget = TcacheWidget(self)
         self.magic_widget = MagicWidget(self)
         self.config_widget = ConfigWidget(self)
+        self.structs_widget = StructsWidget(self)
 
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.addTab(self.tracer_tab, "Tracer")
         self.tabs.addTab(self.arena_widget, "Arena")
         self.tabs.addTab(self.bins_widget, "Bins")
         self.tabs.addTab(self.tcache_widget, "Tcache")
+        self.tabs.addTab(self.structs_widget, "Structs")
         self.tabs.addTab(self.magic_widget, "Magic")
         self.tabs.addTab(self.config_widget, "Config")
 
@@ -100,6 +102,7 @@ class HeapPluginForm(idaapi.PluginForm):
 
     def populate_gui(self):
         self.magic_widget.populate_libc_offsets()
+        self.structs_widget.populate()
         self.reload_gui_info()
 
     def reload_gui_info(self, from_arena_cb=False):
@@ -141,9 +144,9 @@ class HeapPluginForm(idaapi.PluginForm):
 
         except Exception as e:
             self.show_warning(e.message)
-            warning(traceback.format_exc())
+            idaapi.warning(traceback.format_exc())
 
-    def init_heap(self, from_update=False):
+    def init_heap(self):
         try:
             self.config_widget.load_config()
             self.heap = Heap()
@@ -152,8 +155,7 @@ class HeapPluginForm(idaapi.PluginForm):
 
         except Exception as e:
             self.show_warning("Please, fix the config file")
-            warning(str(e))
-            return
+            idaapi.warning(traceback.format_exc())
 
     def populate_arenas(self):
         old_arena = self.cur_arena
@@ -186,10 +188,14 @@ class HeapPluginForm(idaapi.PluginForm):
         self.chunk_widget.show_chunk(address)
 
     def check_freeable(self, address):
-        self.tabs.setCurrentIndex(4)
+        self.tabs.setCurrentIndex(5)
         self.magic_widget.cb_magic.setCurrentIndex(6)
         self.magic_widget.freeable_widget.t_chunk_addr.setText("%#x" % address)
         self.magic_widget.freeable_widget.check_freeable()
+
+    def show_malloc_state(self):
+        self.tabs.setCurrentIndex(4)
+        self.structs_widget.show_malloc_state()
 
     def Show(self):
         return idaapi.PluginForm.Show(self, PLUGNAME, options = (
