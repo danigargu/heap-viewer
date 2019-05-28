@@ -191,11 +191,15 @@ def libc_filename_filter(name):
 
 # --------------------------------------------------------------------------
 def get_libc_module():
-    mod_iter = Modules()
-    for m in mod_iter:
+    for m in Modules():
         if libc_filename_filter(m.name):
-            next_m = next(mod_iter)
-            return (m.base, next_m.base) # start/end
+            end = m.base+m.size
+
+            # include .bss segment
+            bss_end = SegEnd(end)
+            if bss_end != BADADDR:
+                end = bss_end
+            return (m.base, end) # start/end
     return None
 
 # --------------------------------------------------------------------------

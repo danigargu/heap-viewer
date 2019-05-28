@@ -372,6 +372,7 @@ class LibcOffsetsWidget(CustomWidget):
     def get_libc_offsets(self):        
         libc_symbols = {
             'variables': [
+                'environ',
                 '__environ',
                 '__free_hook',
                 '__malloc_hook',
@@ -383,11 +384,15 @@ class LibcOffsetsWidget(CustomWidget):
             ],
             'functions': [                
                 'system',
+                '__libc_system',
                 'execve',
                 'open',
+                '__open64',
                 'read',
                 'write',
+                '__write',
                 '_IO_gets',
+                'gets',
                 'setcontext+0x35',
             ]
         }
