@@ -116,7 +116,7 @@ I'd recommend the following resources alongside this tool for learning heap expl
 
 * Daniel García Gutiérrez - @danigargu
 
-## Contribuitors :beer:
+## Contributors :beer:
 
 Special mention to my colleagues [soez][soez], [wagiro][wagiro] and [DiaLluvioso][DiaLluvioso] for give me some ideas during the development of the plugin. And of course, the [@pwndbg](https://github.com/pwndbg/pwndbg/) project, from which I picked up some things about heap parsing.
 
