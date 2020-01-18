@@ -416,8 +416,11 @@ class Heap(object):
         self.get_ptr = config.get_ptr
         self.main_arena_addr = get_main_arena_addr()
 
+        if self.main_arena_addr is None:
+            raise Exception("Unable to resolve main_arena address")
+
         # structs 
-        self.tcache_enabled = (config.libc_version > "2.25")
+        self.tcache_enabled = self.is_tcache_enabled()
         self.malloc_state_s = malloc_state()
         self.heap_info_s = heap_info()
         self.malloc_chunk_s = malloc_chunk()
@@ -462,6 +465,9 @@ class Heap(object):
         smallbin_width = self.malloc_alignment
         smallbin_correction = int(self.malloc_alignment > 2 * self.ptr_size)
         return ((NSMALLBINS - smallbin_correction) * smallbin_width)
+
+    def is_tcache_enabled(self):
+        return (config.libc_version > "2.25")
 
     def in_smallbin_range(self, sz):
         return sz < self.min_large_size
@@ -1048,16 +1054,15 @@ def find_main_arena():
     offsets = {
         4: [1088, 1096], # 32 bits
         8: [2152, 2160]  # 64 bits
-    }
+    }[config.ptr_size]
 
     if ea == idc.BADADDR or end_ea == idc.BADADDR:
         return None
 
-    get_ptr = config.get_ptr
     while ea < end_ea:
-        ptr = get_ptr(ea) # ptr to main_arena
-        if idaapi.is_loaded(ptr) and ptr < ea and get_ptr(ptr) == 0: # flags=0x0
-            if (ea-ptr) in offsets[config.ptr_size]:
+        ptr = config.get_ptr(ea) # ptr to main_arena
+        if idaapi.is_loaded(ptr) and ptr < ea:
+            if (ea-ptr) in offsets:
                 return ptr
         ea += config.ptr_size
     return None
