@@ -205,7 +205,7 @@ class TracerWidget(CustomWidget):
             h, filename = tempfile.mkstemp(suffix='.html')
 
             with open(filename, 'wb') as f:
-                f.write(html)
+                f.write(html.encode("utf-8"))
 
             url = QtCore.QUrl.fromLocalFile(filename)
             QtGui.QDesktopServices.openUrl(url)
