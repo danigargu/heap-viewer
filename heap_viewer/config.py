@@ -43,8 +43,12 @@ def load():
     m.ptr_mask = (1 << 8*m.ptr_size)-1
     m.program_module = get_program_module()
 
-    with open(CONFIG_PATH, 'rb') as f:
-        config = json.loads(f.read())
+    try:
+        with open(CONFIG_PATH, 'rb') as f:
+            config = json.loads(f.read())
+    except Exception as e:
+        # default config
+        config = {}
 
     m.stop_during_tracing = config.get('stop_during_tracing', True)
     m.start_tracing_at_startup = config.get('start_tracing_at_startup', False)
@@ -80,7 +84,7 @@ def dump():
         'hexdump_limit': m.hexdump_limit,
         'libc_offsets': m.libc_offsets
     }
-    return json.dumps(config, indent=4)
+    return json.dumps(config, indent=4).encode("utf-8")
 
 
 def save():
