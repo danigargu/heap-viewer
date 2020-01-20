@@ -155,7 +155,7 @@ def malloc_state():
         ("top",              t_uint),
         ("last_remainder",   t_uint),
         ("bins",             t_uint * (NBINS * 2 - 2)),
-        ("binmap",           c_uint * BINMAPSIZE),
+        ("binmap",           c_uint * int(BINMAPSIZE)),
         ("next",             t_uint),
         ("next_free",        t_uint),
         ("attached_threads", t_uint),
@@ -261,7 +261,9 @@ class malloc_chunk_base(LittleEndianStructure):
 
     @property
     def data(self):
-        return buffer(self)[:]
+        buffer = create_string_buffer(sizeof(self))
+        memmove(buffer, addressof(self), sizeof(self))
+        return buffer.raw
 
     @property
     def norm_size(self):
@@ -417,10 +419,10 @@ class Heap(object):
         self.main_arena_addr = get_main_arena_addr()
 
         if self.main_arena_addr is None:
-            raise Exception("Unable to resolve main_arena address")
+            raise Exception("Unable to resolve main_arena addr")
 
         # structs 
-        self.tcache_enabled = self.is_tcache_enabled()
+        self.tcache_enabled = (config.libc_version > "2.25")
         self.malloc_state_s = malloc_state()
         self.heap_info_s = heap_info()
         self.malloc_chunk_s = malloc_chunk()
@@ -466,9 +468,6 @@ class Heap(object):
         smallbin_correction = int(self.malloc_alignment > 2 * self.ptr_size)
         return ((NSMALLBINS - smallbin_correction) * smallbin_width)
 
-    def is_tcache_enabled(self):
-        return (config.libc_version > "2.25")
-
     def in_smallbin_range(self, sz):
         return sz < self.min_large_size
 
@@ -479,10 +478,10 @@ class Heap(object):
         return (ptr & ~(HEAP_MAX_SIZE-1))
 
     def csize2tidx(self, x):
-        return ((x) - self.min_chunk_size + self.malloc_alignment - 1) / self.malloc_alignment
+        return int(((x) - self.min_chunk_size + self.malloc_alignment - 1) / self.malloc_alignment)
 
     def tidx2size(self, idx):
-        return (idx * self.malloc_alignment + self.min_chunk_size)
+        return int((idx * self.malloc_alignment + self.min_chunk_size))
 
     def chunk2mem(self, address):
         return address + (self.ptr_size * 2)
@@ -514,7 +513,7 @@ class Heap(object):
         result = [address]
         b_error = False
 
-        if not isLoaded(address):
+        if not is_loaded(address):
             return (result, True)
 
         next_addr = self.get_ptr(address + offset)
@@ -525,7 +524,7 @@ class Heap(object):
                 break
 
             result.append(next_addr)
-            if not isLoaded(next_addr):
+            if not is_loaded(next_addr):
                 break
 
             next_addr = self.get_ptr(next_addr + offset)
@@ -552,7 +551,7 @@ class Heap(object):
         if not address:
             segm = idaapi.get_segm_by_name("[heap]") # same as mp_->sbrk_base
             if segm:
-                return segm.startEA
+                return segm.start_ea
         else:
             heap_addr = self.heap_for_ptr(address)
             heap_addr = heap_addr + sizeof(self.heap_info_s) + sizeof(self.malloc_state_s)
@@ -601,17 +600,17 @@ class Heap(object):
     def get_all_fastbins_chunks(self, address=None):
         chunks = []
         fastbins = self.get_fastbins(address)
-        for size, fast_chunk in fastbins.iteritems():
+        for size, fast_chunk in fastbins.items():
             if fast_chunk:
                 chain, b_error = self.chunk_chain(fast_chunk)
                 chunks.extend(chain)
 
-        return filter(lambda x: x != 0, chunks)
+        return list(filter(lambda x: x != 0, chunks))
 
     def get_all_tcache_chunks(self, address=None):
         chunks = []
         tcache = self.get_tcache(address)
-        for size, entry in tcache.iteritems():
+        for size, entry in tcache.items():
             if entry['next']:
                 chain, b_error = self.tcache_chain(entry['next'])
                 chunks.extend(chain)
@@ -675,7 +674,7 @@ class Heap(object):
         if not heap_base:
             return results
 
-        heap_size = idc.SegEnd(heap_base) - heap_base
+        heap_size = idc.get_segm_end(heap_base) - heap_base
 
         '''
         For prevent incorrect parsing in glibc > 2.25 (i386)
@@ -820,7 +819,7 @@ class Heap(object):
 
         results = []
         while ea < end_ea:
-            fake_size = Dword(ea)
+            fake_size = idc.get_wide_dword(ea)
             idx = self.fastbin_index(fake_size & ~SIZE_BITS)
 
             if 0 <= idx <= 7:
@@ -940,7 +939,7 @@ class Heap(object):
                             (fwd.bk, base))
 
         except Exception as e:
-            errors.append("Exception during parsing: " + str(e.message))
+            errors.append("Exception during parsing: " + str(e))
             warning(traceback.format_exc())
 
         if len(errors) == 0:
@@ -1043,12 +1042,12 @@ class Heap(object):
 
 # --------------------------------------------------------------------------
 def find_main_arena():
-    main_arena = idc.LocByName("main_arena") # from libc6-dbg
+    main_arena = idc.get_name_ea_simple("main_arena") # from libc6-dbg
     if main_arena != idc.BADADDR:
         return main_arena
 
-    ea = idc.SegStart(idc.LocByName("_IO_2_1_stdin_"))
-    end_ea = idc.SegEnd(ea)
+    ea = idc.SegStart(idc.get_name_ea_simple("_IO_2_1_stdin_"))
+    end_ea = idc.get_segm_end(ea)
 
     # &main_arena->next
     offsets = {
@@ -1069,7 +1068,7 @@ def find_main_arena():
 
 # --------------------------------------------------------------------------
 def find_malloc_par():
-    mp_ = idc.LocByName("mp_")
+    mp_ = idc.get_name_ea_simple("mp_")
     if mp_ != idc.BADADDR:
         return mp_
 
@@ -1078,9 +1077,9 @@ def find_malloc_par():
         return None
 
     offset = get_struct_offsets(malloc_par()).get('sbrk_base')
-    sbrk_base = segm.startEA
-    ea = idc.SegStart(LocByName("_IO_2_1_stdin_"))
-    end_ea = idc.SegEnd(ea)
+    sbrk_base = segm.start_ea
+    ea = idc.SegStart(get_name_ea_simple("_IO_2_1_stdin_"))
+    end_ea = idc.get_segm_end(ea)
 
     while ea < end_ea:
         ptr = config.get_ptr(ea)

@@ -94,12 +94,17 @@ class ConfigWidget(CustomWidget):
 
     def get_offsets(self):
         offsets = {}
-        for name, widget in self.offset_widgets.iteritems():
+        for name, widget in self.offset_widgets.items():
             try:
-                value = int(widget.text())
+                offset_str = widget.text()
+                if offset_str.startswith("0x"):
+                    value = int(offset_str, 16)
+                else:
+                    value = int(offset_str)
                 offsets[name] = value
             except:
                 pass
+        print("Offsets: "+str(offsets))
         return offsets
 
     def load_config(self):
@@ -110,7 +115,7 @@ class ConfigWidget(CustomWidget):
         self.t_hexdump_limit.setText("%d" % config.hexdump_limit)
 
         if type(config.libc_offsets) is dict:
-            for name, widget in self.offset_widgets.iteritems():
+            for name, widget in self.offset_widgets.items():
                 value = config.libc_offsets.get(name)
                 if value is not None:
                     widget.setText("%d" % value)

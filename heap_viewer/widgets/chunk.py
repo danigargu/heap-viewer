@@ -235,19 +235,20 @@ class ChunkWidget(CustomWidget):
         return chunk_table
 
 
-    def html_chunk_hexdump(self, data, splitted):
-        hexdump = '<code>'
+    def html_chunk_hexdump(self, data, splitted):    
         line = ''
+        data = bytearray(data)
         data_len = len(data)
         spaces = len(str(data_len))
+
         fmt_offset = "+%-{0}d | ".format(spaces)
+        hexdump = '<code>'
         hexdump += fmt_offset % 0
 
         for i in range(len(data)):
             char = data[i]
-            hexdump += "%02X " % ord(char)
-
-            char = re.sub(r'[<>\'"]', '\x00', char)
+            hexdump += "%02X " % char
+            char = re.sub(r'[<>\'"]', '\x00', chr(char))
             line += char if 0x20 <= ord(char) <= 0x7e else '.'
 
             if (i+1) % config.ptr_size == 0 and i != (len(data)-1):
@@ -326,7 +327,7 @@ class ChunkWidget(CustomWidget):
 
         except Exception as e:
             idaapi.warning("ERROR: " + str(e))
-            #idaapi.warning(traceback.format_exc())
+
 
     def show_chunk(self, expr):
         if type(expr) == str:
@@ -336,7 +337,11 @@ class ChunkWidget(CustomWidget):
         self.view_chunk_info()
 
     def get_chunk_address(self):
-        addr = idaapi.str2ea(self.t_chunk_addr.text().encode("utf-8"))
+        addr_str = self.t_chunk_addr.text()
+        if sys.version_info < (3, 0):
+            addr_str = addr_str.encode("utf-8")
+        addr = idaapi.str2ea(addr_str)
+
         if addr == idc.BADADDR:
             return None
         return addr
@@ -346,7 +351,7 @@ class ChunkWidget(CustomWidget):
         if chunk_addr is None:
             idaapi.warning("Invalid address / expression")
             return
-        idc.Jump(chunk_addr)
+        idc.jumpto(chunk_addr)
 
     def next_on_click(self):
         chunk_addr = self.get_chunk_address()

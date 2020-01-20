@@ -329,13 +329,13 @@ class LibcOffsetsWidget(CustomWidget):
             offset = int(sender.item(sender.currentRow(), 1).text(), 16)
 
             address = self.libc_base + offset
-            idc.Jump(address)
+            idc.jumpto(address)
 
     def tbl_offsets_double_clicked(self):
         sender = self.sender()
         offset = int(sender.item(sender.currentRow(), 1).text(), 16)
         address = self.libc_base + offset
-        idc.Jump(address)
+        idc.jumpto(address)
 
     def populate_table(self):
         self.tbl_offsets_vars.clearContents()
@@ -352,12 +352,12 @@ class LibcOffsetsWidget(CustomWidget):
         variables = offsets['variables']
         functions = offsets['functions']
 
-        for idx, (name, offset) in enumerate(variables.iteritems()):
+        for idx, (name, offset) in enumerate(variables.items()):
             self.tbl_offsets_vars.insertRow(idx)
             self.tbl_offsets_vars.setItem(idx, 0, QtWidgets.QTableWidgetItem(name))
             self.tbl_offsets_vars.setItem(idx, 1, QtWidgets.QTableWidgetItem("0x%x" % offset))
 
-        for idx, (name, offset) in enumerate(functions.iteritems()):
+        for idx, (name, offset) in enumerate(functions.items()):
             self.tbl_offsets_funcs.insertRow(idx)
             self.tbl_offsets_funcs.setItem(idx, 0, QtWidgets.QTableWidgetItem(name))
             self.tbl_offsets_funcs.setItem(idx, 1, QtWidgets.QTableWidgetItem("0x%x" % offset))
@@ -410,7 +410,7 @@ class LibcOffsetsWidget(CustomWidget):
             idaapi.warning("Unable to get glibc symbols")
             return result
 
-        for s_type, symbols in libc_symbols.iteritems():
+        for s_type, symbols in libc_symbols.items():
             for sym in symbols:
 
                 name_expr = parse_name_expr(sym)
@@ -479,7 +479,7 @@ class FakefastWidget(CustomWidget):
             sender.copy_selected_row()
 
         elif action == jump_to:
-            idc.Jump(chunk_addr)
+            idc.jumpto(chunk_addr)
 
         elif action == view_chunk:
             self.parent.parent.show_chunk_info(chunk_addr)
@@ -624,7 +624,7 @@ class IOFileWidget(CustomWidget):
         
     def cb_struct_changed(self, idx):
         struct_name = str(self.cb_struct.currentText())
-        address = LocByName(struct_name)
+        address = get_name_ea_simple(struct_name)
         if address != BADADDR:
             self.t_struct_addr.setText("0x%x" % address)
             self.show_struct(address, struct_name)

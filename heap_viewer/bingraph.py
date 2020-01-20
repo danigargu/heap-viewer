@@ -47,7 +47,7 @@ class BinGraph(idaapi.GraphViewer):
         line =  idaapi.COLSTR("Chunk ", idaapi.SCOLOR_NUMBER)
         line += idaapi.COLSTR("0x%x\n\n" % (chunk_addr), idaapi.SCOLOR_INSN)
         line += idaapi.COLSTR("size: 0x%x\nfd: 0x%x - %s" % \
-                (chunk.size, chunk.fd, idc.SegName(chunk.fd)), SCOLOR_DEFAULT)
+                (chunk.size, chunk.fd, idc.get_segm_name(chunk.fd)), SCOLOR_DEFAULT)
         return line
 
     def tcache_info(self, entry_addr, chunk_addr):        
@@ -66,7 +66,7 @@ class BinGraph(idaapi.GraphViewer):
             chunk_info += "size: 0x%x\n" % chunk.size
 
         chunk_info += "fd: 0x%x - %s\nbk: 0x%x - %s" % (chunk.fd, \
-            idc.SegName(chunk.fd), chunk.bk, idc.SegName(chunk.bk))
+            idc.get_segm_name(chunk.fd), chunk.bk, idc.get_segm_name(chunk.bk))
 
         line += idaapi.COLSTR(chunk_info, idaapi.SCOLOR_DEFAULT)
         return line
@@ -194,7 +194,7 @@ class BinGraph(idaapi.GraphViewer):
     def OnDblClick(self, node_id):
         address = self[node_id][3]
         if address is not None:
-            idc.Jump(address)
+            idc.jumpto(address)
         return True
 
     def OnCommand(self, cmd_id):

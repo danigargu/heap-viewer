@@ -32,12 +32,12 @@ class HeapTracer(DBG_Hooks):
         if self.ptr_size == 4:
             self.regs = {'IP': 'EIP', 'SP': 'ESP', 'AX': 'EAX'}
             self.get_arg = self.arg_from_stack
-            self.get_ptr = Dword
+            self.get_ptr = get_wide_dword
             
         elif self.ptr_size == 8:
             self.regs = {'IP': 'RIP', 'SP': 'RSP', 'AX': 'RAX'}
             self.get_arg = self.arg_from_reg
-            self.get_ptr = Qword
+            self.get_ptr = get_qword
         else:
             raise Exception("Invalid arch")
 
@@ -51,7 +51,7 @@ class HeapTracer(DBG_Hooks):
             'realloc'
         ]        
         for name in funcs:
-            addr = LocByName("__libc_%s" % name)
+            addr = get_name_ea_simple("__libc_%s" % name)
             if addr == BADADDR:
                 warning("Unable to resolve '%s' address" % name)
                 continue
@@ -61,17 +61,17 @@ class HeapTracer(DBG_Hooks):
             set_bpt_attr(addr, BPTATTR_FLAGS, BPT_UPDMEM | BPT_ENABLED)                
                 
     def get_return_address(self):
-        RefreshDebuggerMemory()
-        esp = GetRegValue(self.regs['SP'])
+        refresh_debugger_memory()
+        esp = get_reg_value(self.regs['SP'])
         return self.get_ptr(esp)
 
     def arg_from_stack(self, n_arg):
-        sp = GetRegValue(self.regs['SP']) + self.ptr_size
+        sp = get_reg_value(self.regs['SP']) + self.ptr_size
         return self.get_ptr(sp + (n_arg * self.ptr_size))
 
     def arg_from_reg(self, n_arg):
         regs = ['RDI', 'RSI', 'RDX', 'RCX', 'R10', 'R8', 'R9']
-        return GetRegValue(regs[n_arg])
+        return get_reg_value(regs[n_arg])
 
     def dbg_bpt(self, tid, bptea):
         func_name = self.hooked_funcs.get(bptea)
@@ -105,7 +105,7 @@ class HeapTracer(DBG_Hooks):
             free_chunk = self.get_arg(0)
             args = free_chunk
 
-            caller = PrevHead(ret_addr)
+            caller = prev_head(ret_addr, 0)
 
             self.callback(free_chunk, func_name, None, 
                 None, thread_id, caller, from_ret=False)
@@ -128,31 +128,31 @@ class HeapTracer(DBG_Hooks):
         map(del_bpt, self.hooked_funcs.keys())
 
     def dbg_step_until_ret(self):
-        rip = GetRegValue(self.regs['IP'])
+        rip = get_reg_value(self.regs['IP'])
         caller_info = self.callers.get(rip)
 
         if caller_info is None:
             return 0
 
-        RefreshDebuggerMemory()
-        caller = PrevHead(rip)
+        refresh_debugger_memory()
+        caller = prev_head(rip, 0)
         func_name = caller_info['func']
         thread_id = get_current_thread()
 
         if func_name == 'malloc':
-            addr = GetRegValue(self.regs['AX'])
+            addr = get_reg_value(self.regs['AX'])
             req_size = caller_info['args']
             self.callback(addr, func_name, req_size, 
                 None, thread_id, caller)
 
         elif func_name == 'calloc':
-            addr = GetRegValue(self.regs['AX'])
+            addr = get_reg_value(self.regs['AX'])
             req_nmemb, req_size = caller_info['args']
             self.callback(addr, func_name, req_nmemb, 
                 req_size, thread_id, caller)
 
         elif func_name == 'realloc':
-            addr = GetRegValue(self.regs['AX'])
+            addr = get_reg_value(self.regs['AX'])
             tgt_addr, req_size = caller_info['args']
             self.callback(addr, func_name, tgt_addr, 
                 req_size, thread_id, caller)

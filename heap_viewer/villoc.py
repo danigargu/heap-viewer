@@ -30,7 +30,7 @@ import html
 import random
 import codecs
 
-from cStringIO import StringIO
+from io import StringIO
 
 class State(list):
 

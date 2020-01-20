@@ -4,6 +4,7 @@
 # HeapViewer - by @danigargu
 #
 
+import sys
 import idc
 
 from PyQt5 import QtGui, QtCore, QtWidgets
@@ -223,7 +224,7 @@ class BinsWidget(CustomWidget):
     def jmp_to_selected_chunk(self):
         chunk_addr = self.get_selected_chunk_addr()
         if chunk_addr:
-            idc.Jump(chunk_addr)
+            idc.jumpto(chunk_addr)
 
     def get_selected_chunk_addr(self):
         sender = self.sender()
@@ -255,7 +256,7 @@ class BinsWidget(CustomWidget):
 
         idx = 0
         fastbins = self.heap.get_fastbins(self.cur_arena)
-        for id_fast, (size, fast_chunk) in enumerate(fastbins.iteritems()):
+        for id_fast, (size, fast_chunk) in enumerate(fastbins.items()):
 
             if not self.show_bases and fast_chunk == 0:
                 continue
@@ -313,7 +314,7 @@ class BinsWidget(CustomWidget):
         smallbins = self.heap.get_smallbins(self.cur_arena)
 
         idx = 0
-        for bin_id, smallbin in smallbins.iteritems():
+        for bin_id, smallbin in smallbins.items():
 
             # point to himself
             if not self.show_bases and smallbin['base'] == smallbin['fd']:
@@ -347,7 +348,7 @@ class BinsWidget(CustomWidget):
         largebins = self.heap.get_largebins(self.cur_arena)
 
         idx = 0
-        for bin_id, largebin in largebins.iteritems():
+        for bin_id, largebin in largebins.items():
 
             # point to himself
             if not self.show_bases and largebin['base'] == largebin['fd']:
@@ -437,7 +438,7 @@ class TcacheWidget(CustomWidget):
             sender.copy_selected_row()
 
         elif action == jump_to:
-            idc.Jump(fd_addr)
+            idc.jumpto(fd_addr)
 
         elif action == view_chunk:
             self.show_selected_chunk()
@@ -466,7 +467,7 @@ class TcacheWidget(CustomWidget):
             return
 
         idx = 0
-        for i, (size, entry) in enumerate(tcache.iteritems()):
+        for i, (size, entry) in enumerate(tcache.items()):
 
             if entry['counts'] == 0 and entry['next'] == 0:
                 continue
@@ -526,13 +527,23 @@ def make_html_chain(name, chain, b_error):
         res_html += empty_bin
         return res_html
 
+    arrow_left = ''
+    arrow_right = ''
+
+    if sys.version_info >= (3, 0):
+        arrow_left  = ' ← '
+        arrow_right = ' → '
+    else:
+        arrow_left  = ' ← '.decode("utf-8")
+        arrow_right = ' → '.decode("utf-8")
+
     for i in range(chain_len):
         res_html += "%#x" % chain[i]
         if i != chain_len-1:
             if i == chain_len-2:
-                res_html += ' ← '.decode("utf-8")
+                res_html += arrow_left
             else:
-                res_html += ' → '.decode("utf-8")
+                res_html += arrow_right
     res_html += '</p>'
 
     return res_html

@@ -71,7 +71,7 @@ def get_libc_version_appcall():
 
 # --------------------------------------------------------------------------
 def get_libc_version_64():
-    gnu_get_libc_version = LocByName("gnu_get_libc_version")
+    gnu_get_libc_version = get_name_ea_simple("gnu_get_libc_version")
     if gnu_get_libc_version != BADADDR:
         version = GetString(GetOperandValue(gnu_get_libc_version, 1))
         if len(version) > 0:
@@ -80,11 +80,11 @@ def get_libc_version_64():
 
 # --------------------------------------------------------------------------
 def get_libc_version_disasm():
-    fnc_addr = LocByName("gnu_get_libc_version")
+    fnc_addr = get_name_ea_simple("gnu_get_libc_version")
     if fnc_addr == BADADDR:
         return None
 
-    MakeFunction(fnc_addr)
+    add_func(fnc_addr)
     fnc = get_func(fnc_addr)
     if fnc is None:
         return None
@@ -108,7 +108,7 @@ def get_libc_version():
 def apply_struct(ea, struct_name):
     sid = get_struc_id(struct_name)
     size = idc.GetStrucSize(sid)
-    MakeUnknown(ea, size, idc.DOUNK_DELNAMES)
+    del_items(ea, DELIT_DELNAMES, size)
     doStruct(ea, size, sid)
     return size
 
@@ -155,13 +155,13 @@ def get_proc_name():
 # --------------------------------------------------------------------------
 def get_main_arena_address_x64():
     main_arena = None
-    malloc_addr = LocByName("__libc_malloc")
+    malloc_addr = get_name_ea_simple("__libc_malloc")
     
     if malloc_addr == BADADDR:
         raise Exception("Unable to resolve malloc address")
 
-    if not GetFunctionName(malloc_addr):    
-        MakeFunction(malloc_addr)  
+    if not get_func_name(malloc_addr):
+        add_func(malloc_addr)
 
     for head in Heads(malloc_addr):
         if GetMnem(head) == "cmpxchg" and GetOpType(head, 0) == o_mem:
@@ -178,7 +178,7 @@ def get_libc_base():
 
 # --------------------------------------------------------------------------
 def get_libc_base_old():
-    libc_filter = lambda x: re.findall("libc_.*\.so", SegName(x))
+    libc_filter = lambda x: re.findall("libc_.*\.so", get_segm_name(x))
     for addr in filter(libc_filter, Segments()):
         seg = getseg(addr)
         if seg.perm | SEGPERM_EXEC == seg.perm:
@@ -196,7 +196,7 @@ def get_libc_module():
             end = m.base+m.size
 
             # include .bss segment
-            bss_end = SegEnd(end)
+            bss_end = get_segm_end(end)
             if bss_end != BADADDR:
                 end = bss_end
             return (m.base, end) # start/end
@@ -208,15 +208,15 @@ def get_libc_names():
     if libc_module:
         names = get_debug_names(*libc_module)
         # invert dict to name:address
-        return {v: k for k, v in names.iteritems()}
+        return {v: k for k, v in names.items()}
     return None
 
 # --------------------------------------------------------------------------
 def get_func_name_offset(ea):
     func = idaapi.get_func(ea)
     if func:
-        offset = ea - func.startEA
-        return "%s+%#x" % (GetFunctionName(ea), offset)
+        offset = ea - func.start_ea
+        return "%s+%#x" % (get_func_name(ea), offset)
     return "%#x" % ea
 
 # --------------------------------------------------------------------------
@@ -224,7 +224,7 @@ def addr_by_name_expr(name):
     m = re.match(r"[\w]+", name)
     if m:
         sym_name = m.group()
-        addr = LocByName(sym_name)
+        addr = get_name_ea_simple(sym_name)
         if addr != BADADDR:
             name = name.replace(sym_name, str(addr))
             return int(eval(name))
@@ -247,7 +247,7 @@ def is_process_suspended():
 
 # --------------------------------------------------------------------------
 def check_overlap(addr, size, chunk_list):
-    for start, info in chunk_list.iteritems():
+    for start, info in chunk_list.items():
         end = info['end']
 
         if (addr >= start and addr < end) or \
@@ -281,7 +281,7 @@ def get_module(ea):
 # --------------------------------------------------------------------------
 def get_program_module():
     #rc = idaapi.get_first_module(m_info)
-    entry_point = StartEA()
+    entry_point = get_inf_attr(INF_START_EA)
     if entry_point == BADADDR:
         return None
 

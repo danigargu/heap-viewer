@@ -93,10 +93,10 @@ class ArenaWidget(CustomWidget):
             sender.copy_selected_row()
 
         elif action == jump_to:
-            idc.Jump(chunk_addr)
+            idc.jumpto(chunk_addr)
 
         elif action == jump_to_u:
-            idc.Jump(chunk_addr + (config.ptr_size*2))
+            idc.jumpto(chunk_addr + (config.ptr_size*2))
 
         elif action == view_chunk:
             self.view_selected_chunk()
@@ -117,7 +117,7 @@ class ArenaWidget(CustomWidget):
         self.t_last_remainder.setText("%#x" % arena.last_remainder)
         self.t_attached_threads.setText("%d" % arena.attached_threads)
 
-        top_segname = idc.SegName(arena.top)
+        top_segname = idc.get_segm_name(arena.top)
         if not any(s in top_segname for s in ['heap','debug']):
             self.lbl_top_warning.setVisible(True)
             self.lbl_top_warning.setText("Top points to '%s' segment" % top_segname)

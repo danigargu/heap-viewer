@@ -36,9 +36,9 @@ def load():
     m.libc_base = get_libc_base()
 
     if m.ptr_size == 4:
-        m.get_ptr = idc.Dword
+        m.get_ptr = idc.get_wide_dword
     elif m.ptr_size == 8:
-        m.get_ptr = idc.Qword
+        m.get_ptr = idc.get_qword
 
     m.ptr_mask = (1 << 8*m.ptr_size)-1
     m.program_module = get_program_module()
@@ -85,7 +85,8 @@ def dump():
 
 def save():
     with open(CONFIG_PATH, 'wb') as f:
-        f.write(dump())
+        config_json = dump()
+        f.write(config_json)
 
 """
 def update_file(data):

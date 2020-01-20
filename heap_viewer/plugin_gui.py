@@ -111,7 +111,7 @@ class HeapPluginForm(idaapi.PluginForm):
 
         try:
             if not misc.is_process_suspended():
-                answer = idaapi.askyn_c(
+                answer = idaapi.ask_yn(
                     idaapi.ASKBTN_YES, 
                     "HIDECANCEL\nThe process must be suspended to reload the info.\n\
                     Do you want to suspend it?")
@@ -143,7 +143,7 @@ class HeapPluginForm(idaapi.PluginForm):
             self.bins_widget.populate_tables()
 
         except Exception as e:
-            self.show_warning(e.message)
+            self.show_warning(str(e))
             idaapi.warning(traceback.format_exc())
 
     def init_heap(self):
@@ -199,7 +199,7 @@ class HeapPluginForm(idaapi.PluginForm):
 
     def Show(self):
         return idaapi.PluginForm.Show(self, PLUGNAME, options = (
-            idaapi.PluginForm.FORM_TAB | idaapi.PluginForm.FORM_CLOSE_LATER
+            idaapi.PluginForm.WOPN_TAB | idaapi.PluginForm.WCLS_CLOSE_LATER
         ))
     
     def OnClose(self, form):

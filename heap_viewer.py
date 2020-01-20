@@ -36,7 +36,7 @@ class HeapViewPlugin(idaapi.plugin_t):
             f.Show()
 
         except Exception as e:
-            idaapi.warning("[%s] %s" % (PLUGNAME, e.message))
+            idaapi.warning("[%s] %s" % (PLUGNAME, str(e)))
 
     def add_menus(self):
         # To avoid creating multiple plugin_t instances

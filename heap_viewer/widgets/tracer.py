@@ -103,15 +103,15 @@ class TracerWidget(CustomWidget):
             sender.copy_selected_row()
 
         elif action == jump_to:
-            idc.Jump(chunk_addr - (config.ptr_size*2))
+            idc.jumpto(chunk_addr - (config.ptr_size*2))
 
         elif action == jump_to_u:
-            idc.Jump(chunk_addr)
+            idc.jumpto(chunk_addr)
 
         elif action == goto_caller:
             caller_str = str(sender.item(sender.currentRow(), 6).text())
             if caller_str:
-                idc.Jump(str2ea(caller_str))
+                idc.jumpto(str2ea(caller_str))
 
         elif action == view_chunk:
             self.view_selected_chunk()
@@ -245,7 +245,7 @@ class TracerWidget(CustomWidget):
             idaapi.info(self.row_info[current_row])
 
     def update_allocated_chunks(self):
-        for start, info in self.allocated_chunks.iteritems():
+        for start, info in self.allocated_chunks.items():
             try:
                 chunk = self.heap.get_chunk(start)
                 if chunk.norm_size != info['size']:
