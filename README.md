@@ -10,11 +10,11 @@ Currently supports the glibc malloc implementation (ptmalloc2).
 
 ## Requirements
 
-* IDA Pro >= 6.9
+* IDA Pro >= 7.0
 
 ## Tested on
 
-* glibc 2.23 <= 2.28 (x86, x64)
+* glibc 2.23 <= 2.29 (x86, x64)
 
 ## Features
 
