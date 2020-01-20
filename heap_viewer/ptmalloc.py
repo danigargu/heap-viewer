@@ -1046,7 +1046,7 @@ def find_main_arena():
     if main_arena != idc.BADADDR:
         return main_arena
 
-    ea = idc.SegStart(idc.get_name_ea_simple("_IO_2_1_stdin_"))
+    ea = idc.get_segm_start(idc.get_name_ea_simple("_IO_2_1_stdin_"))
     end_ea = idc.get_segm_end(ea)
 
     # &main_arena->next
@@ -1078,7 +1078,7 @@ def find_malloc_par():
 
     offset = get_struct_offsets(malloc_par()).get('sbrk_base')
     sbrk_base = segm.start_ea
-    ea = idc.SegStart(get_name_ea_simple("_IO_2_1_stdin_"))
+    ea = idc.get_segm_start(get_name_ea_simple("_IO_2_1_stdin_"))
     end_ea = idc.get_segm_end(ea)
 
     while ea < end_ea:
