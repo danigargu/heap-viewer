@@ -26,11 +26,16 @@
 #
 
 import re
+import sys
 import html
 import random
 import codecs
 
-from io import StringIO
+if sys.version_info < (3, 0):
+    from cStringIO import StringIO
+else:
+    from io import StringIO
+
 
 class State(list):
 
@@ -142,7 +147,7 @@ class Block(Printable):
 
     @property
     def rsize(self):
-        ptr_size = self.header / 2
+        ptr_size = int(self.header / 2)
         malloc_align_mask = (self.round - 1)
         min_size = (self.minsz + malloc_align_mask) & ~malloc_align_mask
         size = self.usize + ptr_size + malloc_align_mask
@@ -570,7 +575,12 @@ $(window).scroll(function(){
 
 def build_html(data):
     random.seed(226)
-    data = codecs.getreader('utf8')(StringIO(data), errors='ignore')
+
+    if sys.version_info < (3, 0):
+        data = codecs.getreader('utf8')(StringIO(data), errors='ignore')
+    else:
+        data = StringIO(data)
+
     timeline, boundaries = build_timeline(parse_ltrace(data))
     out = StringIO()
     gen_html(timeline, boundaries, out)
