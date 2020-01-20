@@ -84,12 +84,12 @@ def dump():
         'hexdump_limit': m.hexdump_limit,
         'libc_offsets': m.libc_offsets
     }
-    return json.dumps(config, indent=4).encode("utf-8")
+    return json.dumps(config, indent=4)
 
 
 def save():
     with open(CONFIG_PATH, 'wb') as f:
-        config_json = dump()
+        config_json = dump().encode("utf-8")
         f.write(config_json)
 
 """
