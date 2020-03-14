@@ -600,6 +600,8 @@ class Heap(object):
     def get_all_fastbins_chunks(self, address=None):
         chunks = []
         fastbins = self.get_fastbins(address)
+        if fastbins is None:
+            fastbins = {}
         for size, fast_chunk in fastbins.items():
             if fast_chunk:
                 chain, b_error = self.chunk_chain(fast_chunk)
@@ -610,6 +612,8 @@ class Heap(object):
     def get_all_tcache_chunks(self, address=None):
         chunks = []
         tcache = self.get_tcache(address)
+        if tcache is None:
+            tcache = {}
         for size, entry in tcache.items():
             if entry['next']:
                 chain, b_error = self.tcache_chain(entry['next'])
