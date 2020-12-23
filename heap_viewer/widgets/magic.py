@@ -10,7 +10,7 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
 from collections import OrderedDict
-from cgi import escape as html_encode
+from html import escape as html_encode
 
 from heap_viewer.misc import *
 from heap_viewer.widgets.custom import CustomWidget, TTable
