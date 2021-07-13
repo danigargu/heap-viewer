@@ -14,7 +14,7 @@ Currently supports the glibc malloc implementation (ptmalloc2).
 
 ## Tested on
 
-* glibc 2.23 <= 2.29 (x86, x64)
+* glibc 2.23 <= 2.31 (x86, x64)
 
 ## Features
 

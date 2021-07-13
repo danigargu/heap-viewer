@@ -88,54 +88,7 @@ def malloc_par():
         _fields_ = fields
 
     return malloc_par_struct
-
-"""
-class malloc_par(LittleEndianStructure):
-    def __str__(self):
-        pass
-
-class malloc_par_32(malloc_par):
-    _fields_ =  [
-        ("trim_threshold",        c_uint32),
-        ("top_pad",               c_uint32),
-        ("mmap_threshold",        c_uint32),
-        ("arena_test",            c_uint32),
-        ("arena_max",             c_uint32),
-        ("n_mmaps",               c_int),
-        ("n_mmaps_max",           c_int),
-        ("max_n_mmaps",           c_int),
-        ("no_dyn_threshold",      c_int),
-        ("mmapped_mem",           c_uint32),
-        ("max_mmapped_mem",       c_uint32),
-        #("max_total_mem",        c_uint32),
-        ("sbrk_base",             c_uint32),
-        ("tcache_bins",           c_uint32),
-        ("tcache_max_bytes",      c_uint32),
-        ("tcache_count",          c_uint32),
-        ("tcache_unsorted_limit", c_uint32)
-    ]
-
-class malloc_par_64(malloc_par):
-    _fields_ =  [
-        ("trim_threshold",        c_uint64),
-        ("top_pad",               c_uint64),
-        ("mmap_threshold",        c_uint64),
-        ("arena_test",            c_uint64),
-        ("arena_max",             c_uint64),
-        ("n_mmaps",               c_int),
-        ("n_mmaps_max",           c_int),
-        ("max_n_mmaps",           c_int),
-        ("no_dyn_threshold",      c_int),
-        ("mmapped_mem",           c_uint64),
-        ("max_mmapped_mem",       c_uint64),
-        #("max_total_mem",         c_uint64),
-        ("sbrk_base",             c_uint64),
-        ("tcache_bins",           c_uint64),
-        ("tcache_max_bytes",      c_uint64),
-        ("tcache_count",          c_uint64),
-        ("tcache_unsorted_limit", c_uint64)
-    ]
-"""
+    
 
 #-----------------------------------------------------------------------
 # struct malloc_state (Arenas)
@@ -169,74 +122,6 @@ def malloc_state():
 
     return malloc_state_struct
 
-"""
-class malloc_state_32(malloc_state):
-    _fields_ =  [
-        ("mutex",            c_int),
-        ("flags",            c_int),
-        ("fastbinsY",        c_uint32 * NFASTBINS),
-        ("top",              c_uint32),
-        ("last_remainder",   c_uint32),
-        ("bins",             c_uint32 * (NBINS * 2 - 2)),
-        ("binmap",           c_uint * BINMAPSIZE),
-        ("next",             c_uint32),
-        ("next_free",        c_uint32),
-        ("attached_threads", c_uint32),
-        ("system_mem",       c_uint32),
-        ("max_system_mem",   c_uint32)
-    ]
-
-class malloc_state_32_new(malloc_state):
-    _fields_ =  [
-        ("mutex",            c_int),
-        ("flags",            c_int),
-        ("have_fastchunks",  c_int),
-        ("fastbinsY",        c_uint32 * (NFASTBINS + 1)),
-        ("top",              c_uint32),
-        ("last_remainder",   c_uint32),
-        ("bins",             c_uint32 * (NBINS * 2 - 2)),
-        ("binmap",           c_uint * BINMAPSIZE),
-        ("next",             c_uint32),
-        ("next_free",        c_uint32),
-        ("attached_threads", c_uint32),
-        ("system_mem",       c_uint32),
-        ("max_system_mem",   c_uint32)
-    ]
-
-class malloc_state_64(malloc_state):
-    _pack_ = 8
-    _fields_ =  [
-        ("mutex",            c_int),
-        ("flags",            c_int),
-        ("fastbinsY",        c_uint64 * NFASTBINS),
-        ("top",              c_uint64),
-        ("last_remainder",   c_uint64),
-        ("bins",             c_uint64 * (NBINS * 2 - 2)),
-        ("binmap",           c_uint * BINMAPSIZE),
-        ("next",             c_uint64),
-        ("next_free",        c_uint64),
-        ("attached_threads", c_uint32),
-        ("system_mem",       c_uint64),
-        ("max_system_mem",   c_uint64)
-    ]
-
-class malloc_state_64_new(malloc_state):
-    _fields_ =  [
-        ("mutex",            c_int),
-        ("flags",            c_int),
-        ("have_fastchunks",  c_int),
-        ("fastbinsY",        c_uint64 * NFASTBINS),
-        ("top",              c_uint64),
-        ("last_remainder",   c_uint64),
-        ("bins",             c_uint64 * (NBINS * 2 - 2)),
-        ("binmap",           c_uint * BINMAPSIZE),
-        ("next",             c_uint64),
-        ("next_free",        c_uint64),
-        ("attached_threads", c_uint64),
-        ("system_mem",       c_uint64),
-        ("max_system_mem",   c_uint64)
-    ]
-"""
 
 #-----------------------------------------------------------------------
 # struct malloc_chunk
@@ -294,45 +179,15 @@ def malloc_chunk():
             ("fd",          t_uint), # double links -- used only if free.
             ("bk",          t_uint),
 
-            # Only used for large blocks: pointer to next larger size.
+            # Only used for large blocks: pointer to next larger size.
             ("fd_nextsize", t_uint),  # double links -- used only if free.
             ("bk_nextsize", t_uint)
         ]
 
     return malloc_chunk_struct
 
-
-"""
-class malloc_chunk_64(malloc_chunk):
-    _fields_ =  [
-        ("prev_size",   c_uint64), # Size of previous chunk (if free).
-        ("size",        c_uint64), # Size in bytes, including overhead.
-
-        ("fd",          c_uint64), # double links -- used only if free.
-        ("bk",          c_uint64),
-
-        # Only used for large blocks: pointer to next larger size.
-        ("fd_nextsize", c_uint64),  # double links -- used only if free.
-        ("bk_nextsize", c_uint64)
-    ]
-
-class malloc_chunk_32(malloc_chunk):
-    _fields_ =  [
-        ("prev_size",   c_uint32), # Size of previous chunk (if free).
-        ("size",        c_uint32), # Size in bytes, including overhead.
-
-        ("fd",          c_uint32), # double links -- used only if free.
-        ("bk",          c_uint32),
-
-        # Only used for large blocks: pointer to next larger size.
-        ("fd_nextsize", c_uint32),  # double links -- used only if free.
-        ("bk_nextsize", c_uint32)
-    ]
-"""
-
 #-----------------------------------------------------------------------
 # struct heap_info
-
 
 def heap_info():
     t_int, t_uint = heap_types.get(config.ptr_size)
@@ -349,52 +204,26 @@ def heap_info():
     return heap_info_struct
 
 
-"""
-class heap_info_32(LittleEndianStructure):
-    _fields_ =  [
-        ("ar_ptr",        c_uint32), # Arena for this heap.
-        ("prev",          c_uint32), # Previous heap.
-        ("size",          c_uint32), # Current size in bytes.
-        ("mprotect_size", c_uint32), # Size in bytes that has been mprotected
-    ]
-
-class heap_info_64(LittleEndianStructure):
-    _fields_ =  [
-        ("ar_ptr",        c_uint64), # Arena for this heap.
-        ("prev",          c_uint64), # Previous heap.
-        ("size",          c_uint64), # Current size in bytes.
-        ("mprotect_size", c_uint64), # Size in bytes that has been mprotected
-    ]
-"""
-
 # -----------------------------------------------------------------------
 # Tcache structs
 
 def tcache_perthread():
     t_int, t_uint = heap_types.get(config.ptr_size)
 
+    fields = [
+        ("counts", c_ubyte * TCACHE_BINS),
+        ("entries", t_uint * TCACHE_BINS)
+    ]
+
+    if config.libc_version >= "2.31":
+        fields[0] = ("counts", c_uint16 * TCACHE_BINS)
+
     class tcache_perthread_struct(LittleEndianStructure):
         _pack_ = config.ptr_size
-        _fields_ = [
-            ("counts",  c_ubyte * TCACHE_BINS),
-            ("entries", t_uint * TCACHE_BINS),
-        ]
+        _fields_ = fields
 
     return tcache_perthread_struct
 
-"""
-class tcache_perthread_32(LittleEndianStructure): 
-    _fields_ =  [
-        ("counts",           c_ubyte * TCACHE_BINS),
-        ("entries",          c_uint32 * TCACHE_BINS),
-    ]
-
-class tcache_perthread_64(LittleEndianStructure):
-    _fields_ =  [
-        ("counts",           c_ubyte * TCACHE_BINS),
-        ("entries",          c_uint64 * TCACHE_BINS),
-    ]
-"""
 
 # -----------------------------------------------------------------------
 # ptmalloc2 allocator - Glibc Heap

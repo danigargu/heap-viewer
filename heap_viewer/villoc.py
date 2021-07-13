@@ -223,7 +223,7 @@ def calloc(state, ret, nmemb, size):
 
 def free(state, ret, ptr):
 
-    if ptr is 0:
+    if ptr == 0:
         return
 
     s, match = match_ptr(state, ptr)
