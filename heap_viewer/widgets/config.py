@@ -80,7 +80,7 @@ class ConfigWidget(CustomWidget):
         form_offsets.addRow("main_arena", self.t_main_arena)
         form_offsets.addRow("mp_ (malloc_par)", self.t_malloc_par)
         form_offsets.addRow("global_max_fast", self.t_global_max_fast)
-        form_offsets.addRow("glibc_version", self.glibc_version)
+        form_offsets.addRow("glibc_version", self.t_glibc_version)
 
         groupbox_offsets = QtWidgets.QGroupBox("glibc offsets (optional)")
         groupbox_offsets.setLayout(form_offsets)
