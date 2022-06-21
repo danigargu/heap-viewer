@@ -4,6 +4,7 @@
 # HeapViewer - by @danigargu
 #
 
+from .version import Version
 import sys
 import json
 import idc
@@ -18,7 +19,7 @@ program_module = None
 main_arena = None
 malloc_par = None
 global_max_fast = None
-libc_version = None
+libc_version: Version = None
 libc_base = None
 stop_during_tracing = None
 start_tracing_at_startup = None
@@ -29,10 +30,11 @@ libc_offsets = None
 
 m = sys.modules[__name__]
 
+
 def load():
     config = None
     m.ptr_size = get_arch_ptrsize()
-    m.libc_version = get_libc_version()
+    m.libc_version = Version(get_libc_version() or '2.33')
     m.libc_base = get_libc_base()
 
     if m.ptr_size == 4:
@@ -52,7 +54,8 @@ def load():
 
     m.stop_during_tracing = config.get('stop_during_tracing', True)
     m.start_tracing_at_startup = config.get('start_tracing_at_startup', False)
-    m.detect_double_frees_and_overlaps = config.get('detect_double_frees_and_overlaps', True)
+    m.detect_double_frees_and_overlaps = config.get(
+        'detect_double_frees_and_overlaps', True)
     m.filter_library_calls = config.get('filter_library_calls', False)
     m.hexdump_limit = config.get('hexdump_limit', 1024)
     m.libc_offsets = config.get('libc_offsets')
@@ -70,7 +73,7 @@ def load():
 
     if malloc_par is not None:
         malloc_par += m.libc_base
-        
+
     m.main_arena = main_arena
     m.malloc_par = malloc_par
 
@@ -92,10 +95,10 @@ def save():
         config_json = dump().encode("utf-8")
         f.write(config_json)
 
+
 """
 def update_file(data):
     config = json.loads(data)
     with open(CONFIG_PATH, 'wb') as f:
         f.write(json.dumps(config, indent=4))
 """
-
