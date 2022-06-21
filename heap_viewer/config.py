@@ -54,7 +54,7 @@ def load():
         print(
             f'Warning:libc version fetch fail,you should configure in config-panel manually,default set to {DEFAULT_LIBC_VERSION}')
     libc_version = Version(libc_version)
-    print(f'libc version set to:{libc_versionlibc_version}')
+    print(f'libc version set to:{libc_version}')
     m.libc_version = libc_version
 
     if m.ptr_size == 4:
