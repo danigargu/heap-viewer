@@ -22,10 +22,7 @@ def log(msg):
 
 # --------------------------------------------------------------------------
 def get_struct(address, struct_type):
-    # if not idaapi.is_loaded(address):
-    #     print(f'memory at {hex(address)} is not loaded')
-    #     return None
-    # assert idaapi.is_loaded(address) == True, "Can't access memory at 0x%x" % address
+    assert idaapi.is_loaded(address) , f'memory at {hex(address)} is not loaded.\nthere maybe something wrong with your libc-version detect.'
     sbytes = idaapi.get_bytes(address, sizeof(struct_type))
     struct = struct_type.from_buffer_copy(sbytes)
     struct._addr = address

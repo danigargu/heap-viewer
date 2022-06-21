@@ -34,7 +34,6 @@ m = sys.modules[__name__]
 def load():
     config = None
     m.ptr_size = get_arch_ptrsize()
-    m.libc_version = Version(get_libc_version() or '2.33')
     m.libc_base = get_libc_base()
 
     if m.ptr_size == 4:
@@ -59,6 +58,8 @@ def load():
     m.filter_library_calls = config.get('filter_library_calls', False)
     m.hexdump_limit = config.get('hexdump_limit', 1024)
     m.libc_offsets = config.get('libc_offsets')
+    libc_version = get_libc_version()
+    
 
     main_arena = None
     malloc_par = None
@@ -67,7 +68,12 @@ def load():
         main_arena = m.libc_offsets.get("main_arena")
         malloc_par = m.libc_offsets.get("mp_")
         global_max_fast = m.libc_offsets.get("global_max_fast")
-
+        libc_version = libc_version or m.libc_offsets.get("glibc_version")
+    if not libc_version:
+        DEFAULT_LIBC_VERSION = '2.33'
+        libc_version = DEFAULT_LIBC_VERSION # default libc version 
+        print(f'Warning:libc version fetch fail,you should configure in config-panel manually,default set to {DEFAULT_LIBC_VERSION}')
+    libc_version = Version(libc_version)
     if main_arena is not None:
         main_arena += m.libc_base
 
