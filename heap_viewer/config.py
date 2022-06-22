@@ -36,8 +36,9 @@ def load():
     config = None
     m.ptr_size = get_arch_ptrsize()
     m.libc_base = get_libc_base()
-    libc_version = get_libc_version()
-    
+    # libc_version = get_libc_version()
+    libc_version = None
+
     try:
         with open(CONFIG_PATH, 'rb') as f:
             config = json.loads(f.read())
@@ -54,6 +55,7 @@ def load():
         print(
             f'Warning:libc version fetch fail,you should configure in config-panel manually,default set to {DEFAULT_LIBC_VERSION}')
     libc_version = Version(libc_version)
+    # libc_version = Version('2.33')
     print(f'libc version set to:{libc_version}')
     m.libc_version = libc_version
 
