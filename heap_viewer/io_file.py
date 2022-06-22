@@ -187,7 +187,11 @@ def parse_structs(address):
         return None
 
     io_file_data = get_struct(address, structs.file)
+    if not io_file_data:
+        return None
     io_jump_data = get_struct(io_file_data.vtable, structs.vtable)
+    if not io_jump_data:
+        return None
 
     io_plus = structs.file_plus()
     io_plus.file = io_file_data
