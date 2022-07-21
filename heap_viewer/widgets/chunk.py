@@ -20,6 +20,8 @@ from heap_viewer.ptmalloc import *
 from heap_viewer import config
 
 # -----------------------------------------------------------------------
+
+
 class ChunkEditor(QtWidgets.QDialog):
     def __init__(self, addr, parent=None):
         super(ChunkEditor, self).__init__(parent)
@@ -35,7 +37,7 @@ class ChunkEditor(QtWidgets.QDialog):
         lbl.setStyleSheet("font-weight: bold")
 
         form = QtWidgets.QFormLayout()
-        form.setLabelAlignment(Qt.AlignLeft|Qt.AlignVCenter)
+        form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.t_prev_size = QtWidgets.QLineEdit()
         self.t_size = QtWidgets.QLineEdit()
         self.t_fd = QtWidgets.QLineEdit()
@@ -195,7 +197,6 @@ class ChunkWidget(CustomWidget):
         hbox_actions.setContentsMargins(0, 0, 0, 0)
         self.setLayout(hbox_actions)
 
-
     def html_chunk_table(self, chunk, in_use):
         chunk_table = '<table>'
         offset = 0
@@ -211,7 +212,8 @@ class ChunkWidget(CustomWidget):
             ''' % (offset, name, value)
             offset += sizeof(ctype)
 
-        chunk_table += '<tr><td></td><td>norm_size</td><td>%#x</td></tr>' % (chunk.norm_size)
+        chunk_table += '<tr><td></td><td>norm_size</td><td>%#x</td></tr>' % (
+            chunk.norm_size)
 
         for field in ['prev_inuse', 'is_mmapped', 'non_main_arena']:
             chunk_table += '''
@@ -234,27 +236,30 @@ class ChunkWidget(CustomWidget):
         chunk_table += '</table>'
         return chunk_table
 
-
-    def html_chunk_hexdump(self, data, splitted):    
+    def html_chunk_hexdump(self, chunk_addr: int, chunk_data: bytes, splitted: bool):
         line = ''
-        data = bytearray(data)
+        data = bytearray(chunk_data)
         data_len = len(data)
-        spaces = len(str(data_len))
+        spaces = len(hex(data_len+chunk_addr)) - 2
+        spaces_len = len(str(data_len))
 
-        fmt_offset = "+%-{0}d | ".format(spaces)
+        fmt_offset = "%-{1}d | 0x%-{0}x | ".format(spaces, spaces_len)
         hexdump = '<code>'
-        hexdump += fmt_offset % 0
+        hexdump += fmt_offset % (0,chunk_addr)
 
         for i in range(len(data)):
             char = data[i]
-            hexdump += "%02X " % char
+            hexdump += "%02X" % char
             char = re.sub(r'[<>\'"]', '\x00', chr(char))
             line += char if 0x20 <= ord(char) <= 0x7e else '.'
-
-            if (i+1) % config.ptr_size == 0 and i != (len(data)-1):
-                hexdump += ' | %s<br>' % line
-                hexdump += fmt_offset % (i+1)
-                line = ''
+            if i != (len(data)-1):
+                if (i+1) % (2*config.ptr_size) == 0:
+                    # new line for double-size
+                    hexdump += ' | %s<br>' % line
+                    hexdump += fmt_offset % (i+1, chunk_addr+i+1)
+                    line = ''
+                elif (i+1) % config.ptr_size == 0:
+                    hexdump += ' ' # add a space for single-size
         hexdump += ' | %s<br>' % line
 
         if splitted:
@@ -262,7 +267,6 @@ class ChunkWidget(CustomWidget):
 
         hexdump += "</code>"
         return hexdump
-
 
     def view_chunk_info(self):
         chunk_template = '''
@@ -304,8 +308,8 @@ class ChunkWidget(CustomWidget):
             chunk_hexdump = ""
             chunk = self.heap.get_chunk(chunk_addr)
             chunk_bytes = chunk.norm_size
-      
-            if chunk_bytes > config.hexdump_limit: 
+
+            if chunk_bytes > config.hexdump_limit:
                 chunk_bytes = config.hexdump_limit
                 splitted = True
 
@@ -319,15 +323,19 @@ class ChunkWidget(CustomWidget):
 
             chunk_table = self.html_chunk_table(chunk, in_use)
             if chunk_data:
-                chunk_hexdump = self.html_chunk_hexdump(chunk_data, splitted)
+                chunk_hexdump = self.html_chunk_hexdump(
+                    chunk_data=chunk_data,
+                    splitted=splitted,
+                    chunk_addr=chunk_addr
+                )
 
             self.te_chunk_info.clear()
-            chunk_info = chunk_template % (chunk_addr, chunk_table, chunk_hexdump)
+            chunk_info = chunk_template % (
+                chunk_addr, chunk_table, chunk_hexdump)
             self.te_chunk_info.insertHtml(chunk_info)
 
         except Exception as e:
             idaapi.warning("ERROR: " + str(e))
-
 
     def show_chunk(self, expr):
         if type(expr) == str:
@@ -365,8 +373,8 @@ class ChunkWidget(CustomWidget):
             if idaapi.is_loaded(next_addr):
                 self.show_chunk("%#x" % next_addr)
             else:
-                idaapi.warning("%#x: next chunk (%#x) is not loaded" % \
-                    (chunk_addr, next_addr))
+                idaapi.warning("%#x: next chunk (%#x) is not loaded" %
+                               (chunk_addr, next_addr))
 
         except Exception as e:
             idaapi.warning("ERROR: " + str(e))
