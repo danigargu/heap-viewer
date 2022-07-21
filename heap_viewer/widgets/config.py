@@ -14,12 +14,14 @@ from heap_viewer import config
 from heap_viewer import misc
 
 # -----------------------------------------------------------------------
+
+
 class ConfigWidget(CustomWidget):
     def __init__(self, parent=None):
         super(ConfigWidget, self).__init__(parent)
         self._create_gui()
 
-    def _create_gui(self):        
+    def _create_gui(self):
         self.t_config = QtWidgets.QTextEdit()
         self.t_config.setFixedHeight(440)
 
@@ -29,8 +31,9 @@ class ConfigWidget(CustomWidget):
         self.btn_update_config.clicked.connect(self.update_config)
         self.btn_dump_config.clicked.connect(self.dump_config)
 
-        hbox_update_config = QtWidgets.QHBoxLayout()        
-        hbox_update_config.addWidget(QtWidgets.QLabel("Config file (config.json)"))
+        hbox_update_config = QtWidgets.QHBoxLayout()
+        hbox_update_config.addWidget(
+            QtWidgets.QLabel("Config file (config.json)"))
         hbox_update_config.addWidget(self.btn_update_config)
         hbox_update_config.addWidget(self.btn_dump_config)
         hbox_update_config.addStretch(1)
@@ -38,7 +41,8 @@ class ConfigWidget(CustomWidget):
         groupbox_tracer = QtWidgets.QGroupBox("Tracer options")
         self.opt1 = QtWidgets.QCheckBox("Start tracing at startup")
         self.opt2 = QtWidgets.QCheckBox("Stop during tracing")
-        self.opt3 = QtWidgets.QCheckBox("Detect double frees and chunk overlaps")
+        self.opt3 = QtWidgets.QCheckBox(
+            "Detect double frees and chunk overlaps")
         self.opt4 = QtWidgets.QCheckBox("Filter library calls")
 
         vbox_tracer = QtWidgets.QVBoxLayout()
@@ -60,22 +64,23 @@ class ConfigWidget(CustomWidget):
 
         form_offsets = QtWidgets.QFormLayout()
         form_offsets.setSpacing(5)
-        form_offsets.setLabelAlignment(Qt.AlignLeft|Qt.AlignVCenter)
+        form_offsets.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.t_main_arena = QtWidgets.QLineEdit()
         self.t_malloc_par = QtWidgets.QLineEdit()
         self.t_global_max_fast = QtWidgets.QLineEdit()
-
+        self.t_glibc_version = QtWidgets.QLineEdit('2.33')
         self.offset_widgets = {
             'main_arena': self.t_main_arena,
             'malloc_par': self.t_malloc_par,
-            'global_max_fast': self.t_global_max_fast
+            'global_max_fast': self.t_global_max_fast,
+            'glibc_version': self.t_glibc_version,
         }
 
         form_offsets.addRow("main_arena", self.t_main_arena)
         form_offsets.addRow("mp_ (malloc_par)", self.t_malloc_par)
         form_offsets.addRow("global_max_fast", self.t_global_max_fast)
-
+        form_offsets.addRow("glibc_version", self.t_glibc_version)
 
         groupbox_offsets = QtWidgets.QGroupBox("glibc offsets (optional)")
         groupbox_offsets.setLayout(form_offsets)

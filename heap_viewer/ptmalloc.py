@@ -507,7 +507,7 @@ class Heap(object):
         if not heap_base:
             return results
 
-        heap_size = idc.get_segm_end(heap_base) - heap_base
+        heap_end = idc.get_segm_end(heap_base)
 
         '''
         For prevent incorrect parsing in glibc > 2.25 (i386)
@@ -521,10 +521,12 @@ class Heap(object):
             chunk = self.get_chunk(chunk_addr)
             real_size = chunk.norm_size
 
-            if real_size == 0 or real_size > heap_size:
-                status = 'Corrupt'
+            if real_size == 0:
+                status = 'attempt get 0 size chunk'
                 stop_parse = True
-
+            elif  chunk_addr + real_size >= heap_end:
+                status = 'attempt get ptr overflowed chunk'
+                stop_parse = True
             elif chunk_addr == arena.top:
                 status = 'arena->top'
                 stop_parse = True
