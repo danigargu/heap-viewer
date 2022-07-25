@@ -25,8 +25,8 @@ class ConfigWidget(CustomWidget):
         self.t_config = QtWidgets.QTextEdit()
         self.t_config.setFixedHeight(440)
 
-        self.btn_update_config = QtWidgets.QPushButton("Update")
-        self.btn_dump_config = QtWidgets.QPushButton("Dump json")
+        self.btn_update_config = QtWidgets.QPushButton("Save Config")
+        self.btn_dump_config = QtWidgets.QPushButton("Dump to json")
 
         self.btn_update_config.clicked.connect(self.update_config)
         self.btn_dump_config.clicked.connect(self.dump_config)
@@ -102,7 +102,9 @@ class ConfigWidget(CustomWidget):
         for name, widget in self.offset_widgets.items():
             try:
                 offset_str = widget.text()
-                if offset_str.startswith("0x"):
+                if '.' in offset_str:
+                    value = offset_str
+                elif offset_str.startswith("0x"):
                     value = int(offset_str, 16)
                 else:
                     value = int(offset_str)
@@ -123,7 +125,10 @@ class ConfigWidget(CustomWidget):
             for name, widget in self.offset_widgets.items():
                 value = config.libc_offsets.get(name)
                 if value is not None:
-                    widget.setText("%d" % value)
+                    if isinstance(value, str):
+                        widget.setText(value)
+                    else:
+                        widget.setText("%x" % value)
 
     def update_config(self):
         try:
